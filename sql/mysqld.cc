@@ -1345,6 +1345,7 @@ struct my_rnd_struct sql_rand; ///< used by sql_class.cc:THD::THD()
 #ifndef EMBEDDED_LIBRARY
 std::vector<MYSQL_SOCKET> listen_sockets;
 bool unix_sock_is_online= false;
+static int systemd_sock_activation; /* systemd socket activation */
 /**
   Error reporter that buffer log messages.
   @param level          log message level
@@ -1683,12 +1684,15 @@ static void close_connections(void)
 
   /* Abort listening to new connections */
   DBUG_PRINT("quit",("Closing sockets"));
-  for (std::vector<MYSQL_SOCKET>::iterator sock = listen_sockets.begin();
+
+  for (std::vector<MYSQL_SOCKET>::iterator sock= listen_sockets.begin();
        sock != listen_sockets.end(); ++sock)
   {
     (void) mysql_socket_close(*sock);
-    if (sock->is_unix_domain_socket)
+    if (sock->is_unix_domain_socket && !systemd_sock_activation)
+    {
       (void) unlink(mysqld_unix_port);
+    }
   }
   listen_sockets.clear();
 
@@ -2338,6 +2342,62 @@ static void activate_tcp_port(uint port,
   DBUG_VOID_RETURN;
 }
 
+/**
+   Activate usage of a systemd activated sockets
+   i.e started by mariadb.socket
+*/
+
+static void use_systemd_activated_sockets()
+{
+  MYSQL_SOCKET sock;
+  int fd;
+  char **names = NULL;
+  int sd_sockets;
+  DBUG_ENTER("use_systemd_activated_sockets");
+
+  sd_sockets= sd_listen_fds_with_names(0, &names);
+
+  if (!sd_sockets)
+  {
+    DBUG_VOID_RETURN;
+  }
+  DBUG_PRINT("general",("Systemd listen_fds is %d", sd_sockets));
+  while (sd_sockets--)
+  {
+    fd= SD_LISTEN_FDS_START + sd_sockets;
+    if (sd_is_socket_unix(fd,  SOCK_STREAM, 1, NULL, 0))
+    {
+      sock= mysql_socket_fd(key_socket_unix, fd);
+      sock.is_unix_domain_socket= 1;
+    }
+    else if (sd_is_socket_inet(fd, AF_UNSPEC, SOCK_STREAM, 1, 0))
+    {
+      sock= mysql_socket_fd(key_socket_tcpip, fd);
+      sock.is_unix_domain_socket= 0;
+    }
+    else
+    {
+      sql_print_error("Unknown systemd socket activation socket %d,"
+                      " not listening, not unix or TCP socket, or not a type SOCK_STREAM", fd);
+      if (names)
+      {
+        free(names);
+      }
+      unireg_abort(1);
+    }
+    sock.is_extra_port= names && strcmp(names[sd_sockets], "extra") == 0;
+    mysql_socket_set_thread_owner(sock);
+    listen_sockets.push_back(sock);
+  }
+  systemd_sock_activation= 1;
+  if (names)
+  {
+    free(names);
+  }
+
+  DBUG_VOID_RETURN;
+}
+
 static void network_init(void)
 {
 #ifdef HAVE_SYS_UN_H
@@ -2345,6 +2405,8 @@ static void network_init(void)
   int	arg;
 #endif
   DBUG_ENTER("network_init");
+
+  use_systemd_activated_sockets();
 
   if (MYSQL_CALLBACK_ELSE(thread_scheduler, init, (), 0))
     unireg_abort(1);			/* purecov: inspected */
@@ -2362,7 +2424,7 @@ static void network_init(void)
   if (!opt_disable_networking)
     DBUG_ASSERT(report_port != 0);
 #endif
-  if (!opt_disable_networking && !opt_bootstrap)
+  if (!opt_disable_networking && !opt_bootstrap && !systemd_sock_activation)
   {
     if (mysqld_port)
       activate_tcp_port(mysqld_port, &listen_sockets,
@@ -2376,7 +2438,7 @@ static void network_init(void)
   /*
   ** Create the UNIX socket
   */
-  if (mysqld_unix_port[0] && !opt_bootstrap)
+  if (mysqld_unix_port[0] && !opt_bootstrap && systemd_sock_activation==0)
   {
     MYSQL_SOCKET unix_sock= MYSQL_INVALID_SOCKET;
     size_t port_len;
@@ -5585,8 +5647,9 @@ int mysqld_main(int argc, char **argv)
 
   if (IS_SYSVAR_AUTOSIZE(&server_version_ptr))
     sql_print_information(ER_DEFAULT(ER_STARTUP), my_progname, server_version,
-                          (unix_sock_is_online ? mysqld_unix_port : (char*) ""),
-                          mysqld_port, MYSQL_COMPILATION_COMMENT);
+                          (systemd_sock_activation ? "Systemd socket activated ports" :
+                            (unix_sock_is_online ? mysqld_unix_port : (char*) "")),
+                          (systemd_sock_activation ? 0 : mysqld_port), MYSQL_COMPILATION_COMMENT);
   else
   {
     char real_server_version[2 * SERVER_VERSION_LENGTH + 10];
@@ -5597,8 +5660,9 @@ int mysqld_main(int argc, char **argv)
 
     sql_print_information(ER_DEFAULT(ER_STARTUP), my_progname,
                           real_server_version,
-                          (unix_sock_is_online ? mysqld_unix_port : (char*) ""),
-                          mysqld_port, MYSQL_COMPILATION_COMMENT);
+                          (systemd_sock_activation ? "Systemd socket activated ports" :
+                            (unix_sock_is_online ? mysqld_unix_port : (char*) "")),
+                          (systemd_sock_activation ? 0 : mysqld_port), MYSQL_COMPILATION_COMMENT);
   }
 
 #ifndef _WIN32
