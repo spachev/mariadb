@@ -264,9 +264,9 @@ sub get_dbh {
             MKDEBUG && _d("$dbh: $sql");
             $dbh->do($sql);
             MKDEBUG && _d('Enabling charset for STDOUT');
-            if ( $charset eq 'utf8' ) {
-               binmode(STDOUT, ':utf8')
-                  or die "Can't binmode(STDOUT, ':utf8'): $OS_ERROR";
+            if ( $charset eq 'utf8mb3' ) {
+               binmode(STDOUT, ':utf8mb3')
+                  or die "Can't binmode(STDOUT, ':utf8mb3'): $OS_ERROR";
             }
             else {
                binmode(STDOUT) or die "Can't binmode(STDOUT): $OS_ERROR";

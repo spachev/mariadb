@@ -1,6 +1,6 @@
 <charsets>
 
-  <charset name="utf8">
+  <charset name="utf8mb3">
     <collation name="utf8_phone_ci" id="352">
       <rules>
         <reset>\u0000</reset>
@@ -379,7 +379,7 @@
     </collation>
   </charset>
 
-  <charset name="utf8">
+  <charset name="utf8mb3">
     <collation name="utf8_bengali_standard_ci" id="336">
       <rules>
         <reset>\u9FA</reset>

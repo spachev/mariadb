@@ -10817,7 +10817,7 @@ Column_definition::Column_definition(THD *thd, Field *old_field,
       default_value= new (thd->mem_root) Virtual_column_info();
       default_value->expr=
         new (thd->mem_root) Item_string(thd, pos, res->length(), charset);
-      default_value->utf8= 0;
+      default_value->utf8mb3= 0;
     }
   }
 }

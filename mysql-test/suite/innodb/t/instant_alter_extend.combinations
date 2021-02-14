@@ -1,5 +1,5 @@
 [latin1]
 character-set-server=latin1
 
-[utf8]
-character-set-server=utf8
+[utf8mb3]
+character-set-server=utf8mb3

@@ -21,7 +21,7 @@ CREATE DATABASE /*!32312 IF NOT EXISTS*/ `mysqltest1` /*!40100 DEFAULT CHARACTER
 
 USE `mysqltest1`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+/*!40101 SET character_set_client = utf8mb3 */;
 CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -31,7 +31,7 @@ CREATE DATABASE /*!32312 IF NOT EXISTS*/ `mysqltest2` /*!40100 DEFAULT CHARACTER
 
 USE `mysqltest2`;
 SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+SET character_set_client = utf8mb3;
 /*!50001 CREATE TABLE `v2` (
   `a` tinyint NOT NULL
 ) ENGINE=MyISAM */;
@@ -41,31 +41,31 @@ CREATE DATABASE /*!32312 IF NOT EXISTS*/ `mysqltest3` /*!40100 DEFAULT CHARACTER
 
 USE `mysqltest3`;
 SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+SET character_set_client = utf8mb3;
 /*!50001 CREATE TABLE `v3` (
   `a` tinyint NOT NULL
 ) ENGINE=MyISAM */;
 SET character_set_client = @saved_cs_client;
 SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+SET character_set_client = utf8mb3;
 /*!50001 CREATE TABLE `v3i` (
   `a` tinyint NOT NULL
 ) ENGINE=MyISAM */;
 SET character_set_client = @saved_cs_client;
 SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+SET character_set_client = utf8mb3;
 /*!50001 CREATE TABLE `v3is` (
   `schema_name` tinyint NOT NULL
 ) ENGINE=MyISAM */;
 SET character_set_client = @saved_cs_client;
 SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+SET character_set_client = utf8mb3;
 /*!50001 CREATE TABLE `v3nt` (
   `1` tinyint NOT NULL
 ) ENGINE=MyISAM */;
 SET character_set_client = @saved_cs_client;
 SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+SET character_set_client = utf8mb3;
 /*!50001 CREATE TABLE `v3ps` (
   `user` tinyint NOT NULL
 ) ENGINE=MyISAM */;
@@ -242,7 +242,7 @@ lock table v1 read;
 disconnect con1;
 connection default;
 SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
+SET character_set_client = utf8mb3;
 /*!50001 CREATE TABLE `v1` (
   `id` tinyint NOT NULL
 ) ENGINE=MyISAM */;

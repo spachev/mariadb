@@ -343,7 +343,12 @@ int main(int, char **)
 {
   MY_INIT("pfs_connect_attr-t");
 
-  cs_cp1251= get_charset_by_csname("cp1251", MY_CS_PRIMARY, MYF(0));
+  cs_cp1251= thd->get_charset_by_csname("cp1251",
+                                         thd->variables.old_behavior &
+                                         OLD_MODE_UTF8_IS_UTF8M3 ?
+                                         MY_CS_PRIMARY | MY_CS_UTF8_IS_UTF8MB3 :
+                                         MY_CS_PRIMARY,
+                                         MYF(0));
   if (!cs_cp1251)
     diag("skipping the cp1251 tests : missing character set");
   plan(59 + (cs_cp1251 ? 10 : 0));

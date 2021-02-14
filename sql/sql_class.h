@@ -189,6 +189,7 @@ enum enum_binlog_row_image {
 #define OLD_MODE_NO_DUP_KEY_WARNINGS_WITH_IGNORE	(1 << 0)
 #define OLD_MODE_NO_PROGRESS_INFO			(1 << 1)
 #define OLD_MODE_ZERO_DATE_TIME_CAST                    (1 << 2)
+#define OLD_MODE_UTF8_IS_UTF8MB3      (1 << 3)
 
 extern char internal_table_name[2];
 extern char empty_c_string[1];
@@ -5247,6 +5248,16 @@ public:
   Item *sp_fix_func_item(Item **it_addr);
   Item *sp_prepare_func_item(Item **it_addr, uint cols= 1);
   bool sp_eval_expr(Field *result_field, Item **expr_item_ptr);
+
+  CHARSET_INFO *get_charset_by_csname(const char *cs_name,
+                                      uint cs_flags,
+                                      myf myf_flags) const
+  {
+    return ::get_charset_by_csname(cs_name,
+                                   this->variables.old_behavior & OLD_MODE_UTF8_IS_UTF8MB3 ?
+                                   cs_flags | MY_CS_UTF8_IS_UTF8MB3 : cs_flags, 
+                                   myf_flags);
+  }
 
 };
 

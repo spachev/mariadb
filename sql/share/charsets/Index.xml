@@ -528,7 +528,7 @@ To make maintaining easier please:
   <collation name="armscii8_nopad_bin" id="1088" flag="binary" flag="nopad"/>
 </charset>
 
-<charset name="utf8">
+<charset name="utf8mb3">
   <family>Unicode</family>
   <description>UTF-8 Unicode</description>
   <alias>utf-8</alias>

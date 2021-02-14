@@ -3408,10 +3408,9 @@ ANALYZE
         "r_loops": 1,
         "r_total_time_ms": "REPLACED",
         "r_limit": 5,
-        "r_used_priority_queue": false,
-        "r_output_rows": 100,
-        "r_buffer_size": "REPLACED",
-        "r_sort_mode": "sort_key,packed_addon_fields",
+        "r_used_priority_queue": true,
+        "r_output_rows": 6,
+        "r_sort_mode": "sort_key,rowid",
         "table": {
           "table_name": "t1",
           "access_type": "ALL",
@@ -3941,7 +3940,7 @@ ANALYZE
         "r_used_priority_queue": false,
         "r_output_rows": 6,
         "r_buffer_size": "REPLACED",
-        "r_sort_mode": "sort_key,packed_addon_fields",
+        "r_sort_mode": "sort_key,rowid",
         "table": {
           "table_name": "t1",
           "access_type": "ALL",
@@ -4003,7 +4002,7 @@ ANALYZE
         "r_used_priority_queue": false,
         "r_output_rows": 10,
         "r_buffer_size": "REPLACED",
-        "r_sort_mode": "packed_sort_key,packed_addon_fields",
+        "r_sort_mode": "packed_sort_key,rowid",
         "table": {
           "table_name": "t1",
           "access_type": "ALL",

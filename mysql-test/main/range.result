@@ -2116,13 +2116,13 @@ INSERT INTO t1 (fd) SELECT fd FROM t1;
 explain
 SELECT * FROM t1 WHERE fd='😁';
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	NULL	NULL	NULL	NULL	NULL	NULL	NULL	Impossible WHERE noticed after reading const tables
+1	SIMPLE	t1	ref	ix_fd	ix_fd	83	const	1	Using where; Using index
 SELECT * FROM t1 WHERE fd='😁';
 id	fd
 # The following must not use range access:
 explain select count(*) from t1 where fd <'😁';
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	ix_fd	ix_fd	63	NULL	#	Using where; Using index
+1	SIMPLE	t1	range	ix_fd	ix_fd	83	NULL	#	Using where; Using index
 select count(*) from t1 where fd <'😁';
 count(*)
 40960
@@ -2366,7 +2366,7 @@ CREATE TABLE t1 (a VARCHAR(10) CHARACTER SET utf8, KEY(a)) ENGINE=MyISAM;
 INSERT INTO t1 VALUES ('a'),('b'),('c'),('d'),('e');
 EXPLAIN SELECT * FROM t1 WHERE a<=>'😎';
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	NULL	NULL	NULL	NULL	NULL	NULL	NULL	Impossible WHERE noticed after reading const tables
+1	SIMPLE	t1	ref	a	a	43	const	1	Using where; Using index
 DROP TABLE t1;
 #
 # MDEV-10185: Assertion `tree1->keys[key_no] && tree2->keys[key_no]' failed in 

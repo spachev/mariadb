@@ -759,9 +759,12 @@ static bool check_charset(sys_var *self, THD *thd, set_var *var)
     else
     {
       ErrConvString err(res); /* Get utf8 '\0' terminated string */
-      if (!(var->save_result.ptr= get_charset_by_csname(err.ptr(),
-                                                         MY_CS_PRIMARY,
-                                                         MYF(0))) &&
+      if (!(var->save_result.ptr= thd->get_charset_by_csname(err.ptr(),
+                                                             thd->variables.old_behavior &
+                                                             OLD_MODE_UTF8_IS_UTF8MB3 ? 
+                                                             MY_CS_UTF8_IS_UTF8MB3 | MY_CS_PRIMARY :
+                                                             MY_CS_PRIMARY,
+                                                             MYF(0))) &&
           !(var->save_result.ptr= get_old_charset_by_name(err.ptr())))
       {
         my_error(ER_UNKNOWN_CHARACTER_SET, MYF(0), err.ptr());
@@ -3694,6 +3697,7 @@ static const char *old_mode_names[]=
   "NO_DUP_KEY_WARNINGS_WITH_IGNORE",
   "NO_PROGRESS_INFO",
   "ZERO_DATE_TIME_CAST",
+  "UTF8_IS_UTF8MB3",
   0
 };
 

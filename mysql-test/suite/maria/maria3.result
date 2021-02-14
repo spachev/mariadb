@@ -639,6 +639,8 @@ d VARCHAR(18990),
 e CHAR(128),
 f CHAR(192)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+Warnings:
+Note	1246	Converting column 'd' from VARCHAR to TEXT
 INSERT INTO t1 VALUES
 (1,'A','B','C','','D'),
 (2,'Abcdefghi','E','F','','G');

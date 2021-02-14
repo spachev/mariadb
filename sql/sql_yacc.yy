@@ -6684,7 +6684,11 @@ charset:
 charset_name:
           ident_or_text
           {
-            if (unlikely(!($$=get_charset_by_csname($1.str,MY_CS_PRIMARY,MYF(0)))))
+            if (unlikely(!($$=thd->get_charset_by_csname($1.str,thd->variables.old_behavior &
+                                                         OLD_MODE_UTF8_IS_UTF8MB3 ?
+                                                         MY_CS_UTF8_IS_UTF8MB3 | MY_CS_PRIMARY :
+                                                         MY_CS_PRIMARY,
+                                                         MYF(0)))))
               my_yyabort_error((ER_UNKNOWN_CHARACTER_SET, MYF(0), $1.str));
           }
         | BINARY { $$= &my_charset_bin; }
@@ -6703,8 +6707,10 @@ opt_load_data_charset:
 old_or_new_charset_name:
           ident_or_text
           {
-            if (unlikely(!($$=get_charset_by_csname($1.str,
-                                                    MY_CS_PRIMARY,MYF(0))) &&
+            if (unlikely(!($$=thd->get_charset_by_csname($1.str,
+                                                    thd->variables.old_behavior & OLD_MODE_UTF8_IS_UTF8MB3 ? 
+                                                    MY_CS_UTF8_IS_UTF8MB3 | MY_CS_PRIMARY : MY_CS_PRIMARY,
+                                                    MYF(0))) &&
                          !($$=get_old_charset_by_name($1.str))))
               my_yyabort_error((ER_UNKNOWN_CHARACTER_SET, MYF(0), $1.str));
           }
@@ -6744,7 +6750,7 @@ charset_or_alias:
         | ASCII_SYM { $$= &my_charset_latin1; }
         | UNICODE_SYM
           {
-            if (unlikely(!($$= get_charset_by_csname("ucs2", MY_CS_PRIMARY,MYF(0)))))
+            if (unlikely(!($$= thd->get_charset_by_csname("ucs2", MY_CS_PRIMARY,MYF(0)))))
               my_yyabort_error((ER_UNKNOWN_CHARACTER_SET, MYF(0), "ucs2"));
           }
         ;

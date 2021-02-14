@@ -2409,7 +2409,7 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
         vcol_info->set_vcol_type(stored ? VCOL_GENERATED_STORED : VCOL_GENERATED_VIRTUAL);
         uint vcol_expr_length= vcol_info_length -
                               (uint)(FRM_VCOL_OLD_HEADER_SIZE(opt_interval_id));
-        vcol_info->utf8= 0; // before 10.2.1 the charset was unknown
+        vcol_info->utf8mb3= 0; // before 10.2.1 the charset was unknown
         int2store(vcol_screen_pos+1, vcol_expr_length); // for parse_vcol_defs()
         vcol_screen_pos+= vcol_info_length;
         share->virtual_fields++;
@@ -2487,7 +2487,7 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
         if (!vcol_info_length) // Expect non-empty expression
           goto err;
         vcol_info->stored_in_db= vcol_screen_pos[3];
-        vcol_info->utf8= 0;
+        vcol_info->utf8mb3= 0;
         vcol_screen_pos+= vcol_info_length + MYSQL57_GCOL_HEADER_SIZE;;
         share->virtual_fields++;
       }
@@ -2522,8 +2522,11 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
         if (!f_is_blob(attr.pack_flag))
         {
           // 3.23 or 4.0 string
-          if (!(attr.charset= get_charset_by_csname(share->table_charset->csname,
-                                                    MY_CS_BINSORT, MYF(0))))
+          if (!(attr.charset= thd->get_charset_by_csname(share->table_charset->csname,
+                                                         thd->variables.old_behavior &
+                                                         OLD_MODE_UTF8_IS_UTF8MB3 ?
+                                                         MY_CS_BINSORT | MY_CS_UTF8_IS_UTF8MB3 :
+                                                         MY_CS_BINSORT, MYF(0))))
             attr.charset= &my_charset_bin;
         }
       }
@@ -3702,7 +3705,7 @@ unpack_vcol_info_from_frm(THD *thd, MEM_ROOT *mem_root, TABLE *table,
   vcol_storage.vcol_info->set_vcol_type(vcol->get_vcol_type());
   vcol_storage.vcol_info->stored_in_db=      vcol->stored_in_db;
   vcol_storage.vcol_info->name=              vcol->name;
-  vcol_storage.vcol_info->utf8=              vcol->utf8;
+  vcol_storage.vcol_info->utf8mb3=              vcol->utf8mb3;
   if (!fix_and_check_vcol_expr(thd, table, vcol_storage.vcol_info))
   {
     *vcol_ptr= vcol_info= vcol_storage.vcol_info;   // Expression ok

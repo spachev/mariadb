@@ -361,7 +361,7 @@ static int add_collation(struct charset_info_st *cs)
         newcs->state|= MY_CS_AVAILABLE | MY_CS_LOADED | MY_CS_NONASCII;
 #endif        
       }
-      else if (!strcmp(cs->csname, "utf8") || !strcmp(cs->csname, "utf8mb3"))
+      else if (!strcmp(cs->csname, "utf8mb3") || !strcmp(cs->csname, "utf8mb3"))
       {
 #if defined (HAVE_CHARSET_utf8mb3) && defined(HAVE_UCA_COLLATIONS)
         copy_uca_collation(newcs, newcs->state & MY_CS_NOPAD ?
@@ -767,7 +767,7 @@ static const char*
 get_charset_name_alias(const char *name)
 {
   if (!my_strcasecmp(&my_charset_latin1, name, "utf8mb3"))
-    return "utf8";
+    return "utf8mb3";
   return NULL;
 }
 
@@ -1004,13 +1004,19 @@ CHARSET_INFO *
 get_charset_by_csname(const char *cs_name, uint cs_flags, myf flags)
 {
   MY_CHARSET_LOADER loader;
+
+  if (!strcasecmp(cs_name, "utf8"))
+  {
+    cs_name = (const char*)(cs_flags & MY_CS_UTF8_IS_UTF8MB3 ? "utf8mb3" : "utf8mb4");
+  }
+
   my_charset_loader_init_mysys(&loader);
   return my_charset_get_by_name(&loader, cs_name, cs_flags, flags);
 }
 
 
 /**
-  Resolve character set by the character set name (utf8, latin1, ...).
+  Resolve character set by the character set name (utf8mb3, latin1, ...).
 
   The function tries to resolve character set by the specified name. If
   there is character set with the given name, it is assigned to the "cs"
@@ -1369,7 +1375,7 @@ static const MY_CSET_OS_NAME charsets[] =
 #ifdef UNCOMMENT_THIS_WHEN_WL_WL_4024_IS_DONE
   {"cp54936",        "gb18030",  my_cs_exact},
 #endif
-  {"cp65001",        "utf8",     my_cs_exact},
+  {"cp65001",        "utf8mb3",     my_cs_exact},
 
 #else /* not Windows */
 
@@ -1453,8 +1459,8 @@ static const MY_CSET_OS_NAME charsets[] =
 
   {"US-ASCII",       "latin1",   my_cs_approx},
 
-  {"utf8",           "utf8",     my_cs_exact},
-  {"utf-8",          "utf8",     my_cs_exact},
+  {"utf8mb3",           "utf8mb3",     my_cs_exact},
+  {"utf-8mb3",          "utf8mb3",     my_cs_exact},
 #endif
   {NULL,             NULL,       0}
 };

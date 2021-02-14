@@ -223,6 +223,7 @@ extern MY_UNI_CTYPE my_uni_ctype[256];
 #define MY_CS_NON1TO1 0x40000  /* Has a complex mapping from characters
                                   to weights, e.g. contractions, expansions,
                                   ignorable characters */
+#define MY_CS_UTF8_IS_UTF8MB3 0x80000
 #define MY_CHARSET_UNDEFINED 0
 
 /* Character repertoire flags */
@@ -1182,7 +1183,7 @@ extern struct charset_info_st my_charset_utf8mb4_general_nopad_ci;
 extern struct charset_info_st my_charset_utf8mb4_unicode_ci;
 extern struct charset_info_st my_charset_utf8mb4_unicode_nopad_ci;
 
-#define MY_UTF8MB3                 "utf8"
+#define MY_UTF8MB3                 "utf8mb3"
 #define MY_UTF8MB4                 "utf8mb4"
 
 my_bool my_cs_have_contractions(CHARSET_INFO *cs);

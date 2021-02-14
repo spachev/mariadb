@@ -401,7 +401,7 @@ Use
 as the default character set for the client and connection\&.
 .sp
 A common issue that can occur when the operating system uses
-utf8
+utf8mb3
 or another multi\-byte character set is that output from the
 \fBmysql\fR
 client is formatted incorrectly, due to the fact that the MariaDB client uses the
@@ -2903,7 +2903,7 @@ ignores Unicode byte order mark (BOM) characters at the beginning of input files
 to change its default character set\&. To do that, invoke
 \fBmysql\fR
 with an option such as
-\fB\-\-default\-character\-set=utf8\fR\&.
+\fB\-\-default\-character\-set=utf8mb3\fR\&.
 .PP
 .SH "MYSQL TIPS"
 .PP

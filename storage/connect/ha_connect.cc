@@ -6099,8 +6099,8 @@ static int connect_assisted_discovery(handlerton *, THD* thd,
 							case FLD_NAME:
 								if (ttp == TAB_PRX ||
 									(ttp == TAB_CSV && topt->data_charset &&
-									(!stricmp(topt->data_charset, "UTF8") ||
-										!stricmp(topt->data_charset, "UTF-8"))))
+									(!stricmp(topt->data_charset, "UTF8MB3") ||
+										!stricmp(topt->data_charset, "UTF-8MB3"))))
 									cnm= crp->Kdata->GetCharValue(i);
 								else
 									cnm= encode(g, crp->Kdata->GetCharValue(i));
@@ -6407,8 +6407,12 @@ int ha_connect::create(const char *name, TABLE *table_arg,
   if (options->data_charset) {
     const CHARSET_INFO *data_charset;
 
-    if (!(data_charset= get_charset_by_csname(options->data_charset,
-                                              MY_CS_PRIMARY, MYF(0)))) {
+    if (!(data_charset= thd->get_charset_by_csname(options->data_charset,
+                                                   thd->variables.old_behavior &
+                                                    OLD_MODE_UTF8_IS_UTF8MB3 ?
+                                                    MY_CS_PRIMARY | MY_CS_UTF8_IS_UTF8MB3 :
+                                                    MY_CS_PRIMARY,
+                                                    MYF(0)))) {
       my_error(ER_UNKNOWN_CHARACTER_SET, MYF(0), options->data_charset);
       DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
       } // endif charset

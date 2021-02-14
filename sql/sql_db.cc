@@ -583,7 +583,11 @@ bool load_db_opt(THD *thd, const char *path, Schema_specification_st *create)
            default-collation commands.
         */
         if (!(create->default_table_charset=
-        get_charset_by_csname(pos+1, MY_CS_PRIMARY, MYF(0))) &&
+        thd->get_charset_by_csname(pos+1, thd->variables.old_behavior &
+                                          OLD_MODE_UTF8_IS_UTF8MB3 ? 
+                                          MY_CS_UTF8_IS_UTF8MB3 | MY_CS_PRIMARY :
+                                          MY_CS_PRIMARY,
+                                          MYF(0))) &&
             !(create->default_table_charset=
               get_charset_by_name(pos+1, MYF(0))))
         {

@@ -3430,7 +3430,7 @@ int mysql_add_invisible_field(THD *thd, List<Create_field> * field_list,
   {
     Virtual_column_info *v= new (thd->mem_root) Virtual_column_info();
     v->expr= default_value;
-    v->utf8= 0;
+    v->utf8mb3= 0;
     fld->default_value= v;
   }
   field_list->push_front(fld, thd->mem_root);

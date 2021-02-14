@@ -580,7 +580,7 @@ Virtual_column_info *add_virtual_expression(THD *thd, Item *expr)
   if (unlikely(!v))
      return 0;
    v->expr= expr;
-   v->utf8= 0;  /* connection charset */
+   v->utf8mb3= 0;  /* connection charset */
    return v;
 }
 
@@ -2788,8 +2788,12 @@ int Lex_input_stream::scan_ident_middle(THD *thd, Lex_ident_cli_st *str,
     m_cpp_text_end= m_cpp_text_start + length;
     body_utf8_append(m_cpp_text_start, m_cpp_tok_start + length);
     ErrConvString csname(str->str + 1, str->length - 1, &my_charset_bin);
-    CHARSET_INFO *cs= get_charset_by_csname(csname.ptr(),
-                                            MY_CS_PRIMARY, MYF(0));
+    CHARSET_INFO *cs= thd->get_charset_by_csname(csname.ptr(),
+                                                 thd->variables.old_behavior &
+                                                 OLD_MODE_UTF8_IS_UTF8MB3 ?
+                                                 MY_CS_UTF8_IS_UTF8MB3 | MY_CS_PRIMARY :
+                                                 MY_CS_PRIMARY,
+                                                 MYF(0));
     if (cs)
     {
       *introducer= cs;

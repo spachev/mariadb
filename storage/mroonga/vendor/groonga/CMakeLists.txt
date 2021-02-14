@@ -95,7 +95,7 @@ set(GRN_LOG_PATH
   "${CMAKE_INSTALL_PREFIX}/var/log/${GRN_PROJECT_NAME}/${GRN_PROJECT_NAME}.log"
   CACHE FILEPATH "log file path")
 set(GRN_DEFAULT_ENCODING
-  "utf8"
+  "utf8mb3"
   CACHE STRING "Groonga's default encoding")
 set(GRN_DEFAULT_MATCH_ESCALATION_THRESHOLD
   0
@@ -268,7 +268,7 @@ if(UNIX)
   ac_check_funcs(pthread_condattr_setpshared)
 endif()
 
-option(GRN_WITH_NFKC "use NFKC based UTF8 normalization." ON)
+option(GRN_WITH_NFKC "use NFKC based UTF8MB3 normalization." ON)
 
 if(WIN32)
   ac_check_headers(winsock2.h)

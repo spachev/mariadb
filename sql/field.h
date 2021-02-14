@@ -582,7 +582,7 @@ private:
 public:
   /* Flag indicating  that the field is physically stored in the database */
   bool stored_in_db;
-  bool utf8;                                    /* Already in utf8 */
+  bool utf8mb3;                                    /* Already in utf8 */
   bool automatic_name;
   Item *expr;
   Lex_ident name;                               /* Name of constraint */
@@ -593,7 +593,7 @@ public:
    :Type_handler_hybrid_field_type(&type_handler_null),
     vcol_type((enum_vcol_info_type)VCOL_TYPE_NONE),
     in_partitioning_expr(FALSE), stored_in_db(FALSE),
-    utf8(TRUE), automatic_name(FALSE), expr(NULL), flags(0)
+    utf8mb3(TRUE), automatic_name(FALSE), expr(NULL), flags(0)
   {
     name.str= NULL;
     name.length= 0;
