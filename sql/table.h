@@ -903,15 +903,15 @@ struct TABLE_SHARE
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   /* filled in when reading from frm */
   bool auto_partitioned;
-  char *partition_info_str;
-  uint  partition_info_str_len;
-  uint  partition_info_buffer_size;
+  /* NB: yyUnput() requires write access to sql buffer */
+  LEX_STRING part_sql;
+  uint partition_info_buffer_size;
   plugin_ref default_part_plugin;
 #endif
 
   bool partitioned() const
   {
-    return IF_PARTITIONING(partition_info_str != NULL, false);
+    return IF_PARTITIONING(part_sql.str != NULL, false);
   }
 
   /**

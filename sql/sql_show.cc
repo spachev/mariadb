@@ -5536,7 +5536,7 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
     if (share->db_type() == partition_hton &&
-        share->partition_info_str_len)
+        share->part_sql.length)
     {
       tmp_db_type= plugin_hton(share->default_part_plugin);
       is_partitioned= TRUE;

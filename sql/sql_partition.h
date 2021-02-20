@@ -102,8 +102,7 @@ void get_full_part_id_from_key(const TABLE *table, uchar *buf,
                                KEY *key_info,
                                const key_range *key_spec,
                                part_id_range *part_spec);
-bool mysql_unpack_partition(THD *thd, char *part_buf,
-                            uint part_info_len,
+bool mysql_unpack_partition(THD *thd, LEX_STRING part_sql,
                             TABLE *table, bool is_create_table_ind,
                             handlerton *default_db_type,
                             bool *work_part_info_used);

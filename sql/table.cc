@@ -1921,9 +1921,9 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
       uint32 partition_info_str_len = uint4korr(next_chunk);
 #ifdef WITH_PARTITION_STORAGE_ENGINE
       if ((share->partition_info_buffer_size=
-             share->partition_info_str_len= partition_info_str_len))
+             share->part_sql.length= partition_info_str_len))
       {
-        if (!(share->partition_info_str= (char*)
+        if (!(share->part_sql.str= (char*)
               memdup_root(&share->mem_root, next_chunk + 4,
                           partition_info_str_len + 1)))
         {
@@ -3381,7 +3381,7 @@ bool TABLE_SHARE::write_par_image(const uchar *par, size_t len)
 
 int TABLE_SHARE::read_frm_image(const uchar **frm, size_t *len)
 {
-  if (IF_PARTITIONING(partition_info_str, 0))   // cannot discover a partition
+  if (IF_PARTITIONING(part_sql.str, 0))   // cannot discover a partition
   {
     DBUG_ASSERT(db_type()->discover_table == 0);
     return 1;
@@ -4016,7 +4016,7 @@ enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   bool work_part_info_used;
-  if (share->partition_info_str_len && outparam->file)
+  if (share->part_sql.length && outparam->file)
   {
   /*
     In this execution we must avoid calling thd->change_item_tree since
@@ -4037,8 +4037,7 @@ enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
     thd->stmt_arena= &part_func_arena;
     bool tmp;
 
-    tmp= mysql_unpack_partition(thd, share->partition_info_str,
-                                share->partition_info_str_len,
+    tmp= mysql_unpack_partition(thd, share->part_sql,
                                 outparam, is_create_table,
                                 plugin_hton(share->default_part_plugin),
                                 &work_part_info_used);

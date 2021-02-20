@@ -4378,8 +4378,7 @@ void get_partition_set(const TABLE *table, uchar *buf, const uint index,
      possible to retrace this given an item tree.
 */
 
-bool mysql_unpack_partition(THD *thd,
-                            char *part_buf, uint part_info_len,
+bool mysql_unpack_partition(THD *thd, LEX_STRING part_sql,
                             TABLE* table, bool is_create_table_ind,
                             handlerton *default_db_type,
                             bool *work_part_info_used)
@@ -4395,7 +4394,7 @@ bool mysql_unpack_partition(THD *thd,
   thd->variables.character_set_client= system_charset_info;
 
   Parser_state parser_state;
-  if (unlikely(parser_state.init(thd, part_buf, part_info_len)))
+  if (unlikely(parser_state.init(thd, LEX_STRING_WITH_LEN(part_sql))))
     goto end;
 
   if (unlikely(init_lex_with_single_table(thd, table, &lex)))
@@ -4408,7 +4407,7 @@ bool mysql_unpack_partition(THD *thd,
 
   lex.part_info->table= table;       /* Indicates MYSQLparse from this place */
   part_info= lex.part_info;
-  DBUG_PRINT("info", ("Parse: %s", part_buf));
+  DBUG_PRINT("info", ("Parse: %s", part_sql.str));
 
   thd->m_statement_psi= NULL;
   if (unlikely(parse_sql(thd, & parser_state, NULL)) ||
