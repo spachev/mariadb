@@ -4378,13 +4378,11 @@ void get_partition_set(const TABLE *table, uchar *buf, const uint index,
      possible to retrace this given an item tree.
 */
 
-bool mysql_unpack_partition(THD *thd, LEX_STRING part_sql,
-                            TABLE* table, bool is_create_table_ind,
-                            handlerton *default_db_type,
-                            bool *work_part_info_used)
+bool TABLE_SHARE::unpack_partition(THD *thd, bool is_create_table_ind,
+                                   handlerton *default_db_type,
+                                   bool *work_part_info_used)
 {
   bool result= TRUE;
-  partition_info *part_info;
   CHARSET_INFO *old_character_set_client= thd->variables.character_set_client;
   LEX *old_lex= thd->lex;
   LEX lex;
@@ -4397,7 +4395,7 @@ bool mysql_unpack_partition(THD *thd, LEX_STRING part_sql,
   if (unlikely(parser_state.init(thd, LEX_STRING_WITH_LEN(part_sql))))
     goto end;
 
-  if (unlikely(init_lex_with_single_table(thd, table, &lex)))
+  if (unlikely(init_lex_with_single_share(thd, this, &lex)))
     goto end;
 
   *work_part_info_used= FALSE;
@@ -4405,7 +4403,6 @@ bool mysql_unpack_partition(THD *thd, LEX_STRING part_sql,
   if (unlikely(!(lex.part_info= new partition_info())))
     goto end;
 
-  lex.part_info->table= table;       /* Indicates MYSQLparse from this place */
   part_info= lex.part_info;
   DBUG_PRINT("info", ("Parse: %s", part_sql.str));
 
@@ -4456,9 +4453,6 @@ bool mysql_unpack_partition(THD *thd, LEX_STRING part_sql,
     part_info= thd->work_part_info;
     *work_part_info_used= true;
   }
-  table->part_info= part_info;
-  part_info->table= table;
-  table->file->set_part_info(part_info);
   if (!part_info->default_engine_type)
     part_info->default_engine_type= default_db_type;
   DBUG_ASSERT(part_info->default_engine_type == default_db_type);
@@ -4466,7 +4460,7 @@ bool mysql_unpack_partition(THD *thd, LEX_STRING part_sql,
   DBUG_ASSERT(part_info->default_engine_type != partition_hton);
   result= FALSE;
 end:
-  end_lex_with_single_table(thd, table, old_lex);
+  end_lex_with_single_share(thd, old_lex);
   thd->variables.character_set_client= old_character_set_client;
   DBUG_RETURN(result);
 }

@@ -4035,7 +4035,9 @@ enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
                                 Query_arena::STMT_INITIALIZED);
     thd->set_n_backup_active_arena(&part_func_arena, &backup_arena);
     thd->stmt_arena= &part_func_arena;
-    bool tmp;
+
+    DBUG_ASSERT(share->part_info);
+    outparam->part_info= share->part_info->get_clone(thd);
 
     tmp= mysql_unpack_partition(thd, share->part_sql,
                                 outparam, is_create_table,

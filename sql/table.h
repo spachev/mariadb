@@ -907,6 +907,10 @@ struct TABLE_SHARE
   LEX_STRING part_sql;
   uint partition_info_buffer_size;
   plugin_ref default_part_plugin;
+  partition_info *part_info;
+
+  bool unpack_partition(THD *thd, bool is_create_table_ind,
+                        handlerton *default_db_type, bool *work_part_info_used);
 #endif
 
   bool partitioned() const
