@@ -2635,6 +2635,12 @@ bool partition_info::vers_init_info(THD * thd)
 }
 
 
+inline bool is_unpack_partition(const THD *thd)
+{
+  return thd->lex->use_only_table_context;
+}
+
+
 /**
   Assign INTERVAL and STARTS for SYSTEM_TIME partitions.
 
@@ -2676,7 +2682,7 @@ bool partition_info::vers_set_interval(THD* thd, Item* interval,
       case DECIMAL_RESULT:
       case REAL_RESULT:
         /* When table member is defined, we are inside mysql_unpack_partition(). */
-        if (!table || starts->val_int() > TIMESTAMP_MAX_VALUE)
+        if (!is_unpack_partition(thd) || starts->val_int() > TIMESTAMP_MAX_VALUE)
           goto interval_starts_error;
         vers_info->interval.start= (my_time_t) starts->val_int();
         break;
@@ -2694,7 +2700,7 @@ bool partition_info::vers_set_interval(THD* thd, Item* interval,
       default:
         goto interval_starts_error;
     }
-    if (!table)
+    if (!is_unpack_partition(thd))
     {
       if (thd->query_start() < vers_info->interval.start) {
         push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
