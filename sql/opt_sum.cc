@@ -299,6 +299,7 @@ int opt_sum_query(THD *thd,
         tl->schema_table)
     {
       maybe_exact_count&= MY_TEST(!tl->schema_table &&
+//mdev-17399                      !tl->table_function &&
                                   (tl->table->file->ha_table_flags() &
                                    HA_HAS_RECORDS));
       is_exact_count= FALSE;
