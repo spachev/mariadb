@@ -95,7 +95,7 @@ Trigger_creation_ctx::create(THD *thd,
 
   bool invalid_creation_ctx= FALSE;
 
-  if (resolve_charset(client_cs_name->str,
+  if (thd->resolve_charset(client_cs_name->str,
                       thd->variables.character_set_client,
                       &client_cs))
   {
@@ -108,7 +108,7 @@ Trigger_creation_ctx::create(THD *thd,
     invalid_creation_ctx= TRUE;
   }
 
-  if (resolve_collation(connection_cl_name->str,
+  if (thd->resolve_collation(connection_cl_name->str,
                         thd->variables.collation_connection,
                         &connection_cl))
   {
@@ -121,7 +121,7 @@ Trigger_creation_ctx::create(THD *thd,
     invalid_creation_ctx= TRUE;
   }
 
-  if (resolve_collation(db_cl_name->str, NULL, &db_cl))
+  if (thd->resolve_collation(db_cl_name->str, NULL, &db_cl))
   {
     sql_print_warning("Trigger for table '%s'.'%s': "
                       "invalid database_collation value (%s).",

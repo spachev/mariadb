@@ -400,6 +400,10 @@ static int get_options(int *argc, char ***argv)
 
   if ((ho_error=handle_options(argc, argv, my_long_options, get_one_option)))
     exit(ho_error);
+  if(!strcasecmp("utf8",default_charset))
+  {
+    default_charset=(char*)"utf8mb3";
+  }
 
   if (what_to_do == DO_REPAIR && !opt_do_views && !opt_do_tables)
   {

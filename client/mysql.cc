@@ -1918,6 +1918,10 @@ static int get_options(int argc, char **argv)
 
   if ((ho_error=handle_options(&argc, &argv, my_long_options, get_one_option)))
     return(ho_error);
+  if (!strcasecmp("utf8",default_charset))
+  {
+    default_charset=(char*)"utf8mb3";
+  }
 
   *mysql_params->p_max_allowed_packet= opt_max_allowed_packet;
   *mysql_params->p_net_buffer_length= opt_net_buffer_length;

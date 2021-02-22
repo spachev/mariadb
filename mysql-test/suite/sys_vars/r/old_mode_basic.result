@@ -1,22 +1,22 @@
 SET @global_start_value = @@global.old_mode;
 SELECT @global_start_value;
 @global_start_value
-
+UTF8_IS_UTF8MB3
 SET @session_start_value = @@session.old_mode;
 SELECT @session_start_value;
 @session_start_value
-
+UTF8_IS_UTF8MB3
 '#--------------------FN_DYNVARS_152_01------------------------#'
 SET @@global.old_mode = "NO_PROGRESS_INFO";
 SET @@global.old_mode = DEFAULT;
 SELECT @@global.old_mode;
 @@global.old_mode
-
+UTF8_IS_UTF8MB3
 SET @@session.old_mode = "NO_PROGRESS_INFO";
 SET @@session.old_mode = DEFAULT;
 SELECT @@session.old_mode;
 @@session.old_mode
-
+UTF8_IS_UTF8MB3
 '#---------------------FN_DYNVARS_152_02-------------------------#'
 SET @@global.old_mode = NULL;
 ERROR 42000: Variable 'old_mode' can't be set to the value of 'NULL'
@@ -167,8 +167,8 @@ NO_PROGRESS_INFO
 SET @@global.old_mode = @global_start_value;
 SELECT @@global.old_mode;
 @@global.old_mode
-
+UTF8_IS_UTF8MB3
 SET @@session.old_mode = @session_start_value;
 SELECT @@session.old_mode;
 @@session.old_mode
-
+UTF8_IS_UTF8MB3

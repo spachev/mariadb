@@ -9708,7 +9708,7 @@ static bool show_create_trigger_impl(THD *thd, Trigger *trigger)
 
   /* Resolve trigger client character set. */
 
-  if (resolve_charset(trigger->client_cs_name.str, NULL, &trg_client_cs))
+  if (thd->resolve_charset(trigger->client_cs_name.str, NULL, &trg_client_cs))
     return TRUE;
 
   /* Send header. */

@@ -312,7 +312,7 @@ bool load_charset(MEM_ROOT *mem_root,
 
 /*************************************************************************/
 
-bool load_collation(MEM_ROOT *mem_root,
+bool load_collation(THD *thd, MEM_ROOT *mem_root,
                     Field *field,
                     CHARSET_INFO *dflt_cl,
                     CHARSET_INFO **cl)
@@ -326,7 +326,7 @@ bool load_collation(MEM_ROOT *mem_root,
   }
 
   DBUG_ASSERT(cl_name.str[cl_name.length] == 0);
-  *cl= get_charset_by_name(cl_name.str, MYF(0));
+  *cl= thd->get_charset_by_name(cl_name.str, MYF(0));
 
   if (*cl == NULL)
   {
@@ -368,7 +368,7 @@ Stored_routine_creation_ctx::load_from_db(THD *thd,
     invalid_creation_ctx= TRUE;
   }
 
-  if (load_collation(thd->mem_root,
+  if (load_collation(thd,thd->mem_root,
                      proc_tbl->field[MYSQL_PROC_FIELD_COLLATION_CONNECTION],
                      thd->variables.collation_connection,
                      &connection_cl))
@@ -381,7 +381,7 @@ Stored_routine_creation_ctx::load_from_db(THD *thd,
     invalid_creation_ctx= TRUE;
   }
 
-  if (load_collation(thd->mem_root,
+  if (load_collation(thd,thd->mem_root,
                      proc_tbl->field[MYSQL_PROC_FIELD_DB_COLLATION],
                      NULL,
                      &db_cl))

@@ -2194,10 +2194,11 @@ mysqltest1
 EXPLAIN EXTENDED
 SELECT db FROM t1 WHERE db IN (SELECT SCHEMA_NAME FROM information_schema.schemata) ORDER BY db DESC;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	db	NULL	NULL	NULL	4	100.00	Using temporary; Using filesort
-1	PRIMARY	schemata	ALL	NULL	NULL	NULL	NULL	NULL	NULL	Using where; FirstMatch(t1); Using join buffer (flat, BNL join)
+1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	2	100.00	Using temporary; Using filesort
+1	PRIMARY	t1	eq_ref	db	db	764	information_schema.schemata.SCHEMA_NAME	1	100.00	Using where; Using index
+2	MATERIALIZED	schemata	ALL	NULL	NULL	NULL	NULL	NULL	NULL	
 Warnings:
-Note	1003	select `test`.`t1`.`db` AS `db` from `test`.`t1` semi join (`information_schema`.`schemata`) where `test`.`t1`.`db` = convert(`information_schema`.`schemata`.`SCHEMA_NAME` using utf8mb4) order by `test`.`t1`.`db` desc
+Note	1003	select `test`.`t1`.`db` AS `db` from `test`.`t1` semi join (`information_schema`.`schemata`) where `test`.`t1`.`db` = `information_schema`.`schemata`.`SCHEMA_NAME` order by `test`.`t1`.`db` desc
 drop table t1;
 drop database mysqltest1;
 drop database mysqltest2;

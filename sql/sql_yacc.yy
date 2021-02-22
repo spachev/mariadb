@@ -6725,7 +6725,7 @@ old_or_new_charset_name_or_default:
 collation_name:
           ident_or_text
           {
-            if (unlikely(!($$= mysqld_collation_get_by_name($1.str))))
+            if (unlikely(!($$= thd->mysqld_collation_get_by_name($1.str))))
               MYSQL_YYABORT;
           }
         ;

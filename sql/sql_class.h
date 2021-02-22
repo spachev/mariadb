@@ -5258,6 +5258,55 @@ public:
                                    cs_flags | MY_CS_UTF8_IS_UTF8MB3 : cs_flags, 
                                    myf_flags);
   }
+  
+  inline const char* get_collation_or_charset_name(const char* name)
+  {
+     char *copy_of_name= (char*)name;
+     char start[6];
+     strncpy(start, name, 5);
+     char *fname= (char *)(this->variables.old_behavior & OLD_MODE_UTF8_IS_UTF8MB3?"utf8mb3_":"utf8mb4_");      
+      if (!strncasecmp("utf8_", start,5))
+      {
+        copy_of_name+= 5;
+        char result[64];
+        result[63]='\0';
+        strcpy(result, fname);
+        strcat(result, copy_of_name);
+        result[strlen(copy_of_name)+strlen(fname)]='\0';
+        name= (const char *) result;
+      }
+      return name;
+  }
+  
+  inline CHARSET_INFO *
+  mysqld_collation_get_by_name(const char *name,
+                             CHARSET_INFO *name_cs= system_charset_info)
+  {
+    name=this->get_collation_or_charset_name(name);
+    return ::mysqld_collation_get_by_name(name, name_cs);
+}
+
+CHARSET_INFO *get_charset_by_name(const char *cs_name, myf flags)
+{
+
+  cs_name=this->get_collation_or_charset_name(cs_name);
+  return ::get_charset_by_name(cs_name,flags);
+}
+my_bool resolve_charset(const char *cs_name,
+                        CHARSET_INFO *default_cs,
+                        CHARSET_INFO **cs)
+{
+  cs_name=this->get_collation_or_charset_name(cs_name);
+  return ::resolve_charset(cs_name,default_cs,cs);
+}
+
+my_bool resolve_collation(const char *cl_name,
+                          CHARSET_INFO *default_cl,
+                          CHARSET_INFO **cl)
+{
+   cl_name= this->get_collation_or_charset_name(cl_name);
+   return ::resolve_collation(cl_name,default_cl,cl);
+}
 
 };
 

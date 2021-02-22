@@ -4031,6 +4031,10 @@ static int init_common_variables()
     test purposes, to be able to start "mysqld" even if
     the requested character set is not available (see bug#18743).
   */
+ if (!strcasecmp(default_character_set_name,"utf8"))
+ {
+   default_character_set_name=(char*)"utf8mb3";
+ }
   for (;;)
   {
     char *next_character_set_name= strchr(default_character_set_name, ',');
@@ -4038,7 +4042,7 @@ static int init_common_variables()
       *next_character_set_name++= '\0';
     if (!(default_charset_info=
           get_charset_by_csname(default_character_set_name,
-                                MY_CS_PRIMARY, MYF(MY_WME))))
+                                MY_CS_UTF8_IS_UTF8MB3 | MY_CS_PRIMARY, MYF(MY_WME))))
     {
       if (next_character_set_name)
       {
@@ -4052,6 +4056,24 @@ static int init_common_variables()
       break;
   }
 
+    if (default_collation_name)
+    {
+    char *copy_of_name= (char*)default_collation_name;
+    char start[6];
+    strncpy(start, default_collation_name, 5);
+    char *fname= (char *)"utf8mb3_";      
+    if (! strncasecmp("utf8_", start,5))
+    {
+     copy_of_name+= 5;
+     char result[64];
+     result[63]='\0';
+     strcpy(result, fname);
+     strcat(result, copy_of_name);
+     result[strlen(copy_of_name)+strlen(fname)]='\0';
+     default_collation_name= (char *) result;
+    }
+    }
+  
   if (default_collation_name)
   {
     CHARSET_INFO *default_collation;

@@ -41,27 +41,35 @@ drop view v1;
 flush tables;
 check view v1;
 Table	Op	Msg_type	Msg_text
+test.v1	check	Note	Creation context of view `test`.`v1` is invalid
 test.v1	check	status	OK
 check view v1badcheck;
 Table	Op	Msg_type	Msg_text
+test.v1badcheck	check	Note	Creation context of view `test`.`v1badcheck` is invalid
 test.v1badcheck	check	note	View text checksum failed
 check view v2;
 Table	Op	Msg_type	Msg_text
+test.v2	check	Note	Creation context of view `test`.`v2` is invalid
 test.v2	check	status	OK
 check view v3;
 Table	Op	Msg_type	Msg_text
+test.v3	check	Note	Creation context of view `test`.`v3` is invalid
 test.v3	check	status	OK
 check view v1 for upgrade;
 Table	Op	Msg_type	Msg_text
+test.v1	check	Note	Creation context of view `test`.`v1` is invalid
 test.v1	check	error	Upgrade required. Please do "REPAIR VIEW `v1`" or dump/reload to fix it!
 check view v1badcheck for upgrade;
 Table	Op	Msg_type	Msg_text
+test.v1badcheck	check	Note	Creation context of view `test`.`v1badcheck` is invalid
 test.v1badcheck	check	note	View text checksum failed
 check view v2 for upgrade;
 Table	Op	Msg_type	Msg_text
+test.v2	check	Note	Creation context of view `test`.`v2` is invalid
 test.v2	check	error	Upgrade required. Please do "REPAIR VIEW `v2`" or dump/reload to fix it!
 check view v3 for upgrade;
 Table	Op	Msg_type	Msg_text
+test.v3	check	Note	Creation context of view `test`.`v3` is invalid
 test.v3	check	error	Upgrade required. Please do "REPAIR VIEW `v3`" or dump/reload to fix it!
 Phase 1/7: Checking and upgrading mysql database
 Processing databases
@@ -114,10 +122,18 @@ error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
 mysql.user                                         OK
-test.v1                                            OK
-test.v1badcheck                                    OK
-test.v2                                            OK
-test.v3                                            OK
+test.v1
+Note     : Creation context of view `test`.`v1` is invalid
+status   : OK
+test.v1badcheck
+Note     : Creation context of view `test`.`v1badcheck` is invalid
+status   : OK
+test.v2
+Note     : Creation context of view `test`.`v2` is invalid
+status   : OK
+test.v3
+Note     : Creation context of view `test`.`v3` is invalid
+status   : OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
 Phase 6/7: Checking and upgrading tables
@@ -134,23 +150,33 @@ Phase 7/7: Running 'FLUSH PRIVILEGES'
 OK
 show create view v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=MERGE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v1	CREATE ALGORITHM=MERGE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v1` is invalid
 show create view v2;
 View	Create View	character_set_client	collation_connection
-v2	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v2	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v2` is invalid
 show create view v3;
 View	Create View	character_set_client	collation_connection
-v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v3` is invalid
 set sql_log_bin=1;
 REPAIR VIEW v1,v2;
 Table	Op	Msg_type	Msg_text
+test.v1	repair	Note	Creation context of view `test`.`v1` is invalid
 test.v1	repair	status	OK
+test.v2	repair	Note	Creation context of view `test`.`v2` is invalid
 test.v2	repair	status	OK
 REPAIR VIEW v1badcheck;
 Table	Op	Msg_type	Msg_text
+test.v1badcheck	repair	Note	Creation context of view `test`.`v1badcheck` is invalid
 test.v1badcheck	repair	status	OK
 REPAIR NO_WRITE_TO_BINLOG VIEW v3;
 Table	Op	Msg_type	Msg_text
+test.v3	repair	Note	Creation context of view `test`.`v3` is invalid
 test.v3	repair	status	OK
 set sql_log_bin=0;
 include/show_binlog_events.inc
@@ -201,13 +227,19 @@ flush tables;
 create algorithm=temptable view v4 as select a from t1;
 show create view v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=MERGE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v1	CREATE ALGORITHM=MERGE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v1` is invalid
 show create view v2;
 View	Create View	character_set_client	collation_connection
-v2	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v2	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v2` is invalid
 show create view v3;
 View	Create View	character_set_client	collation_connection
-v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v3` is invalid
 show create view v4;
 View	Create View	character_set_client	collation_connection
 v4	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v4` AS select `t1`.`a` AS `a` from `t1`	latin1	latin1_swedish_ci
@@ -264,9 +296,15 @@ error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views from mysql
 mysql.user                                         OK
-test.v1                                            OK
-test.v2                                            OK
-test.v3                                            OK
+test.v1
+Note     : Creation context of view `test`.`v1` is invalid
+status   : OK
+test.v2
+Note     : Creation context of view `test`.`v2` is invalid
+status   : OK
+test.v3
+Note     : Creation context of view `test`.`v3` is invalid
+status   : OK
 test.v4                                            OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
@@ -285,13 +323,19 @@ OK
 flush tables;
 show create view v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v1	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v1` is invalid
 show create view v2;
 View	Create View	character_set_client	collation_connection
-v2	CREATE ALGORITHM=MERGE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v2	CREATE ALGORITHM=MERGE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v2` is invalid
 show create view v3;
 View	Create View	character_set_client	collation_connection
-v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8_general_ci
+v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS select `t1`.`a` AS `a` from `t1`	utf8mb4	utf8mb3_general_ci
+Warnings:
+Note	1600	Creation context of view `test`.`v3` is invalid
 show create view v4;
 View	Create View	character_set_client	collation_connection
 v4	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v4` AS select `t1`.`a` AS `a` from `t1`	latin1	latin1_swedish_ci
@@ -309,9 +353,15 @@ drop table mysql.event;
 rename table mysql.ev_bk to mysql.event;
 test.kv                                            OK
 test.t1                                            OK
-test.v1                                            OK
-test.v2                                            OK
-test.v3                                            OK
+test.v1
+Note     : Creation context of view `test`.`v1` is invalid
+status   : OK
+test.v2
+Note     : Creation context of view `test`.`v2` is invalid
+status   : OK
+test.v3
+Note     : Creation context of view `test`.`v3` is invalid
+status   : OK
 test.v4                                            OK
 include/show_binlog_events.inc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
@@ -389,9 +439,15 @@ error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views from mysql
 mysql.user                                         OK
-test.v1                                            OK
-test.v2                                            OK
-test.v3                                            OK
+test.v1
+Note     : Creation context of view `test`.`v1` is invalid
+status   : OK
+test.v2
+Note     : Creation context of view `test`.`v2` is invalid
+status   : OK
+test.v3
+Note     : Creation context of view `test`.`v3` is invalid
+status   : OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names ... Skipped
 Phase 6/7: Checking and upgrading tables... Skipped

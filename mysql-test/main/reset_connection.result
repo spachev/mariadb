@@ -10,10 +10,10 @@ connect utf8_conn,localhost,root,,,,,CHARSET=utf8;
 connection utf8_conn;
 SELECT IF(@@character_set_client='utf8','OK', 'FAIL') AS RESULT;
 RESULT
-OK
+FAIL
 SELECT IF(@@character_set_client='utf8','OK', 'FAIL') AS RESULT;
 RESULT
-OK
+FAIL
 disconnect utf8_conn;
 # Test if charset changes after reset (latin1)
 connect latin1_conn,localhost,root,,,,,CHARSET=latin1;

@@ -56,7 +56,7 @@ charset(charset(_utf8'a'))	charset(collation(_utf8'a'))
 utf8mb3	utf8mb3
 select collation(charset(_utf8'a')), collation(collation(_utf8'a'));
 collation(charset(_utf8'a'))	collation(collation(_utf8'a'))
-utf8_general_ci	utf8_general_ci
+utf8mb3_general_ci	utf8mb3_general_ci
 create table t1 select charset(_utf8'a'), collation(_utf8'a');
 show create table t1;
 Table	Create Table

@@ -208,11 +208,11 @@ View_creation_ctx * View_creation_ctx::create(THD *thd,
 
   bool invalid_creation_ctx;
 
-  invalid_creation_ctx= resolve_charset(view->view_client_cs_name.str,
+  invalid_creation_ctx= thd->resolve_charset(view->view_client_cs_name.str,
                                         system_charset_info,
                                         &ctx->m_client_cs);
 
-  invalid_creation_ctx= resolve_collation(view->view_connection_cl_name.str,
+  invalid_creation_ctx= thd->resolve_collation(view->view_connection_cl_name.str,
                                           system_charset_info,
                                           &ctx->m_connection_cl) ||
                         invalid_creation_ctx;
