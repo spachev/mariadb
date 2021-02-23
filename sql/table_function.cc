@@ -1107,30 +1107,8 @@ int Table_function_json_table::setup(THD *thd, TABLE_LIST *sql_table,
       my_error(ER_WRONG_USAGE, MYF(0), "JSON_TABLE", "argument"); 
       return TRUE;
     }
-#ifdef MDEV17399
-    if (sql_table->join_list)
-    {
-      List_iterator<TABLE_LIST> it(*sql_table->join_list);
-      TABLE_LIST *tbl;
-      bool dep_met= false;
-
-      while ((tbl= it++) && tbl != sql_table)
-      {
-        if (!dep_met && (m_dep_tables & tbl->get_map()))
-          dep_met= true;
-
-        if (tbl->straight && dep_met)
-        {
-          /* STRAIGHT_JOIN-ed table is used in the argument. */
-          my_error(ER_WRONG_USAGE, MYF(0), "JSON_TABLE", "argument"); 
-          return TRUE;
-        }
-      }
-    }
-#endif /*MDEV17399*/
   }
 
-  m_setup_done= true;
   return FALSE;
 }
 

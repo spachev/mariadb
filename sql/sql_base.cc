@@ -6147,10 +6147,6 @@ find_field_in_table_ref(THD *thd, TABLE_LIST *table_list,
   if (table_list->sequence)
     DBUG_RETURN(0);
 
-  if (table_list->table_function &&
-      !table_list->table_function->ready_for_lookup())
-    DBUG_RETURN(0);
-
   *actual_table= NULL;
 
   if (table_list->field_translation)

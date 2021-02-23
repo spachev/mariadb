@@ -88,7 +88,7 @@ public:
   int m_n_cur_nested;
 
   Json_table_nested_path(Json_table_nested_path *parent_nest):
-    m_parent(parent_nest), m_nested(0), m_next_nested(0),
+    m_null(TRUE), m_parent(parent_nest), m_nested(0), m_next_nested(0),
     m_nested_hook(&m_nested) {}
   int set_path(THD *thd, const LEX_CSTRING &path);
   void scan_start(CHARSET_INFO *i_cs, const uchar *str, const uchar *end);
@@ -175,8 +175,6 @@ public:
 */
 class Table_function_json_table : public Sql_alloc
 {
-protected:
-  bool m_setup_done;
 public:
   Item *m_json; /* The JSON value to be parsed. */
 
@@ -203,7 +201,7 @@ public:
   Json_table_column *m_cur_json_table_column;
   CHARSET_INFO *m_text_literal_cs;
 
-  Table_function_json_table(Item *json): m_setup_done(false),
+  Table_function_json_table(Item *json):
     m_json(json), m_nested_path(0), m_depth(0), m_cur_depth(0) {}
 
   /*
@@ -216,7 +214,6 @@ public:
 
   int setup(THD *thd, TABLE_LIST *sql_table, SELECT_LEX *s_lex);
   /* if the table is ready to be used in Item_field::fix_fieds */
-  bool ready_for_lookup() const { return m_setup_done; }
   bool join_cache_allowed() const { return !m_dep_tables; }
   void get_estimates(ha_rows *out_rows,
                      double *scan_time, double *startup_cost);
