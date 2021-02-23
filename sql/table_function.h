@@ -215,6 +215,7 @@ public:
   int setup(THD *thd, TABLE_LIST *sql_table, SELECT_LEX *s_lex);
   /* if the table is ready to be used in Item_field::fix_fieds */
   bool join_cache_allowed() const { return !m_dep_tables; }
+  table_map used_tables() const { return m_dep_tables; }
   void get_estimates(ha_rows *out_rows,
                      double *scan_time, double *startup_cost);
   int print(THD *thd, TABLE_LIST *sql_table,

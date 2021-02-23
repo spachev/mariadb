@@ -637,6 +637,16 @@ void eliminate_tables(JOIN *join)
   List_iterator<Item> it(join->fields_list);
   while ((item= it++))
     used_tables |= item->used_tables();
+
+  {
+    List_iterator<TABLE_LIST> it(*join->join_list);
+    TABLE_LIST *tbl;
+    while ((tbl= it++))
+    {
+      if (tbl->table_function)
+        used_tables|= tbl->table_function->used_tables();
+    }
+  }
  
   /* Add tables referred to from ORDER BY and GROUP BY lists */
   ORDER *all_lists[]= { join->order, join->group_list};

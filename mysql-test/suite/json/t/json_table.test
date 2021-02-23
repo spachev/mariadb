@@ -301,6 +301,17 @@ SELECT * FROM t1 RIGHT JOIN
   (SELECT o FROM t2, JSON_TABLE(j, '$[*]' COLUMNS (o FOR ORDINALITY)) AS jt) AS t3 ON (t3.o = t1.x);
 DROP TABLE t1, t2;
 
+create table t20 (a int not null);
+create table t21 (a int not null primary key, js varchar(100));
+insert into t20 values (1),(2);
+insert into t21 values (1, '{"a":100}');
+
+explain select t20.a, jt1.ab
+  from t20 left join t21 on t20.a=t21.a
+    join JSON_TABLE(t21.js,'$' COLUMNS (ab INT PATH '$.a')) AS jt1;
+
+drop table t20, t21;
+
 --echo #
 --echo # End of 10.5 tests
 --echo #
