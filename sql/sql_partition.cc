@@ -200,32 +200,28 @@ static bool is_name_in_list(const char *name, List<const char> list_names)
 */
 
 bool partition_default_handling(THD *thd, TABLE *table, partition_info *part_info,
-                                bool is_create_table_ind,
                                 const char *normalized_path)
 {
   DBUG_ENTER("partition_default_handling");
 
-  if (!is_create_table_ind)
+  if (part_info->use_default_num_partitions)
   {
-    if (part_info->use_default_num_partitions)
+    if (table->file->get_no_parts(normalized_path, &part_info->num_parts))
     {
-      if (table->file->get_no_parts(normalized_path, &part_info->num_parts))
-      {
-        DBUG_RETURN(TRUE);
-      }
+      DBUG_RETURN(TRUE);
     }
-    else if (part_info->is_sub_partitioned() &&
-             part_info->use_default_num_subpartitions)
+  }
+  else if (part_info->is_sub_partitioned() &&
+            part_info->use_default_num_subpartitions)
+  {
+    uint num_parts;
+    if (table->file->get_no_parts(normalized_path, &num_parts))
     {
-      uint num_parts;
-      if (table->file->get_no_parts(normalized_path, &num_parts))
-      {
-        DBUG_RETURN(TRUE);
-      }
-      DBUG_ASSERT(part_info->num_parts > 0);
-      DBUG_ASSERT((num_parts % part_info->num_parts) == 0);
-      part_info->num_subparts= num_parts / part_info->num_parts;
+      DBUG_RETURN(TRUE);
     }
+    DBUG_ASSERT(part_info->num_parts > 0);
+    DBUG_ASSERT((num_parts % part_info->num_parts) == 0);
+    part_info->num_subparts= num_parts / part_info->num_parts;
   }
   part_info->set_up_defaults_for_partitioning(thd, table->file,
                                               NULL, 0U);
@@ -827,7 +823,7 @@ int check_signed_flag(partition_info *part_info)
 */
 
 static bool fix_fields_part_func(THD *thd, Item* func_expr, TABLE *table,
-                                 bool is_sub_part, bool is_create_table_ind)
+                                 bool is_sub_part)
 {
   partition_info *part_info= table->part_info;
   bool result= TRUE;
@@ -898,15 +894,14 @@ static bool fix_fields_part_func(THD *thd, Item* func_expr, TABLE *table,
   */
   if (func_expr->walk(&Item::check_valid_arguments_processor, 0, NULL))
   {
-    if (is_create_table_ind)
+    push_warning(thd, Sql_condition::WARN_LEVEL_WARN,
+                  ER_WRONG_EXPR_IN_PARTITION_FUNC_ERROR,
+                  ER_THD(thd, ER_WRONG_EXPR_IN_PARTITION_FUNC_ERROR));
+    if (thd->abort_on_warning)
     {
-      my_error(ER_WRONG_EXPR_IN_PARTITION_FUNC_ERROR, MYF(0));
+      clear_field_flag(table);
       goto end;
     }
-    else
-      push_warning(thd, Sql_condition::WARN_LEVEL_WARN,
-                   ER_WRONG_EXPR_IN_PARTITION_FUNC_ERROR,
-                   ER_THD(thd, ER_WRONG_EXPR_IN_PARTITION_FUNC_ERROR));
   }
 
   if (unlikely((!is_sub_part) && (error= check_signed_flag(part_info))))
@@ -1904,8 +1899,6 @@ bool check_part_func_fields(Field **ptr, bool ok_with_charsets)
     fix_partition_func()
     thd                  The thread object
     table                TABLE object for which partition fields are set-up
-    is_create_table_ind  Indicator of whether openfrm was called as part of
-                         CREATE or ALTER TABLE
 
   RETURN VALUE
     TRUE                 Error
@@ -1924,7 +1917,7 @@ NOTES
     of an error that is not discovered until here.
 */
 
-bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind)
+bool fix_partition_func(THD *thd, TABLE *table)
 {
   bool result= TRUE;
   partition_info *part_info= table->part_info;
@@ -1938,15 +1931,10 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind)
   thd->column_usage= COLUMNS_WRITE;
   DBUG_PRINT("info", ("thd->column_usage: %d", thd->column_usage));
 
-  if (!is_create_table_ind ||
-       thd->lex->sql_command != SQLCOM_CREATE_TABLE)
+  if (partition_default_handling(thd, table, part_info,
+                                 table->s->normalized_path.str))
   {
-    if (partition_default_handling(thd, table, part_info,
-                                   is_create_table_ind,
-                                   table->s->normalized_path.str))
-    {
-      DBUG_RETURN(TRUE);
-    }
+    DBUG_RETURN(TRUE);
   }
   if (part_info->is_sub_partitioned())
   {
@@ -1966,7 +1954,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind)
     else
     {
       if (unlikely(fix_fields_part_func(thd, part_info->subpart_expr,
-                                        table, TRUE, is_create_table_ind)))
+                                        table, TRUE)))
         goto end;
       if (unlikely(part_info->subpart_expr->result_type() != INT_RESULT))
       {
@@ -1994,7 +1982,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind)
     else
     {
       if (unlikely(fix_fields_part_func(thd, part_info->part_expr,
-                                        table, FALSE, is_create_table_ind)))
+                                        table, FALSE)))
         goto end;
       if (unlikely(part_info->part_expr->result_type() != INT_RESULT))
       {
@@ -2018,7 +2006,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind)
         part_info->vers_fix_field_list(thd))
         goto end;
       if (unlikely(fix_fields_part_func(thd, part_info->part_expr,
-                                        table, FALSE, is_create_table_ind)))
+                                        table, FALSE)))
         goto end;
     }
     part_info->fixed= TRUE;
@@ -2114,7 +2102,7 @@ static int add_part_field_list(THD *thd, String *str, List<const char> field_lis
 
 /*
    Must escape strings in partitioned tables frm-files,
-   parsing it later with mysql_unpack_partition will fail otherwise.
+   parsing it later with unpack_partition will fail otherwise.
 */
 
 static int add_keyword_string(String *str, const char *keyword,
@@ -4353,15 +4341,9 @@ void get_partition_set(const TABLE *table, uchar *buf, const uint index,
    data structures of the partitioning.
 
    SYNOPSIS
-     mysql_unpack_partition()
+     TABLE_SHARE::unpack_partition()
      thd                           Thread object
-     part_buf                      Partition info from frm file
-     part_info_len                 Length of partition syntax
-     table                         Table object of partitioned table
-     create_table_ind              Is it called from CREATE TABLE
      default_db_type               What is the default engine of the table
-     work_part_info_used           Flag is raised if we don't create new
-                                   part_info, but used thd->work_part_info
 
    RETURN VALUE
      TRUE                          Error
@@ -4378,9 +4360,7 @@ void get_partition_set(const TABLE *table, uchar *buf, const uint index,
      possible to retrace this given an item tree.
 */
 
-bool TABLE_SHARE::unpack_partition(THD *thd, bool is_create_table_ind,
-                                   handlerton *default_db_type,
-                                   bool *work_part_info_used)
+bool TABLE_SHARE::unpack_partition(THD *thd, handlerton *default_db_type)
 {
   bool result= TRUE;
   CHARSET_INFO *old_character_set_client= thd->variables.character_set_client;
@@ -4397,8 +4377,6 @@ bool TABLE_SHARE::unpack_partition(THD *thd, bool is_create_table_ind,
 
   if (unlikely(init_lex_with_single_share(thd, this, &lex)))
     goto end;
-
-  *work_part_info_used= FALSE;
 
   if (unlikely(!(lex.part_info= new partition_info())))
     goto end;
@@ -4434,25 +4412,6 @@ bool TABLE_SHARE::unpack_partition(THD *thd, bool is_create_table_ind,
   DBUG_PRINT("info", ("default engine = %s, default_db_type = %s",
              ha_resolve_storage_engine_name(part_info->default_engine_type),
              ha_resolve_storage_engine_name(default_db_type)));
-  if (is_create_table_ind && old_lex->sql_command == SQLCOM_CREATE_TABLE)
-  {
-    /*
-      When we come here we are doing a create table. In this case we
-      have already done some preparatory work on the old part_info
-      object. We don't really need this new partition_info object.
-      Thus we go back to the old partition info object.
-      We need to free any memory objects allocated on item_free_list
-      by the parser since we are keeping the old info from the first
-      parser call in CREATE TABLE.
-
-      This table object can not be used any more. However, since
-      this is CREATE TABLE, we know that it will be destroyed by the
-      caller, and rely on that.
-    */
-    thd->free_items();
-    part_info= thd->work_part_info;
-    *work_part_info_used= true;
-  }
   if (!part_info->default_engine_type)
     part_info->default_engine_type= default_db_type;
   DBUG_ASSERT(part_info->default_engine_type == default_db_type);

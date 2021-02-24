@@ -93,7 +93,7 @@ void prune_partition_set(const TABLE *table, part_id_range *part_spec);
 bool check_partition_info(partition_info *part_info,handlerton **eng_type,
                           TABLE *table, handler *file, HA_CREATE_INFO *info);
 void set_linear_hash_mask(partition_info *part_info, uint num_parts);
-bool fix_partition_func(THD *thd, TABLE *table, bool create_table_ind);
+bool fix_partition_func(THD *thd, TABLE *table);
 void get_partition_set(const TABLE *table, uchar *buf, const uint index,
                        const key_range *key_spec,
                        part_id_range *part_spec);

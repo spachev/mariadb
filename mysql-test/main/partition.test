@@ -288,14 +288,6 @@ create index i2 on t1 (a);
 drop table t1;
 
 #
-# Bug#36001: Partitions: spelling and using some error messages
-#
---error ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING
-CREATE TABLE t1 (a INT, FOREIGN KEY (a) REFERENCES t0 (a))
-ENGINE=MyISAM
-PARTITION BY HASH (a);
-
-#
 # Bug#40954: Crash if range search and order by.
 #
 CREATE TABLE t1 (

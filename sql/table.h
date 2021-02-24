@@ -909,8 +909,7 @@ struct TABLE_SHARE
   plugin_ref default_part_plugin;
   partition_info *part_info;
 
-  bool unpack_partition(THD *thd, bool is_create_table_ind,
-                        handlerton *default_db_type, bool *work_part_info_used);
+  bool unpack_partition(THD *thd, handlerton *default_db_type);
 #endif
 
   bool partitioned() const
