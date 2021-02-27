@@ -81,11 +81,6 @@ public:
     The NESTED PATH that is currently scanned in rnd_next.
   */
   Json_table_nested_path *m_cur_nested;
-  /*
-    The order of the above m_cur_nested in the list of the NESTED PATH.
-    Used only to build the reference in position()/rnd_pos().
-  */
-  int m_n_cur_nested;
 
   Json_table_nested_path(Json_table_nested_path *parent_nest):
     m_null(TRUE), m_parent(parent_nest), m_nested(0), m_next_nested(0),
@@ -96,8 +91,6 @@ public:
   int print(THD *thd, Field ***f, String *str,
             List_iterator_fast<Json_table_column> &it,
             Json_table_column **last_column);
-  void get_current_position(const uchar *j_start, uchar *pos) const;
-  void set_position(const uchar *j_start, const uchar *j_end, const uchar *pos);
 };
 
 

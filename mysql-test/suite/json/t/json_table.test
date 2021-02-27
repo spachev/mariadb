@@ -312,6 +312,33 @@ explain select t20.a, jt1.ab
 
 drop table t20, t21;
 
+select * from
+json_table(
+'[
+  {"name": "X",
+    "colors":["blue"], "sizes": [1,2,3,4],  "prices" : [10,20]},
+  {"name": "Y",
+    "colors":["red"], "sizes": [10,11],  "prices" : [100,200,300]}
+]',
+'$[*]' columns
+(
+  seq0 for ordinality,
+  name varchar(4) path '$.name',
+  nested path '$.colors[*]' columns (
+    seq1 for ordinality,
+    color text path '$'
+  ),
+  nested path '$.sizes[*]' columns (
+    seq2 for ordinality,
+    size int path '$'
+  ),
+  nested path '$.prices[*]' columns (
+    seq3 for ordinality,
+    price int path '$'
+  )
+)
+) as T order by seq0, name;
+
 --echo #
 --echo # End of 10.5 tests
 --echo #

@@ -63,7 +63,7 @@ public:
       that call makes no sence for ha_json_table.
    */
     mark_trx_read_write_done= 1;
-    ref_length= (jt->m_depth+1)*(4+4) + jt->m_depth * 1;
+    ref_length= m_jt->m_columns.elements * 4;
   }
   ~ha_json_table() {}
   handler *clone(const char *name, MEM_ROOT *mem_root) { return NULL; }
@@ -152,7 +152,6 @@ void Json_table_nested_path::scan_start(CHARSET_INFO *i_cs,
 {
   json_get_path_start(&m_engine, i_cs, str, end, &m_cur_path);
   m_cur_nested= 0;
-  m_n_cur_nested= 0;
   m_null= false;
   m_ordinality_counter= 0;
 }
@@ -172,7 +171,6 @@ int Json_table_nested_path::scan_next()
     {
       if (m_cur_nested->scan_next() == 0)
         return 0;
-      m_n_cur_nested++;
       if (!(m_cur_nested= m_cur_nested->m_next_nested))
         break;
 handle_new_nested:
@@ -196,72 +194,12 @@ handle_new_nested:
       return 0;
 
     m_cur_nested= m_nested;
-    m_n_cur_nested= 0;
     no_records_found= true;
     goto handle_new_nested;
   }
 
   m_null= true;
   return 1;
-}
-
-
-/*
-  Stores the current position in the form
-  [0..3] - position in the JSON string
-  [4..7] - ORDINALITY counter value
-  if there are nested paths
-    [8] - current NESTED PATH 
-    [9...] - position in the nested path
-*/
-void Json_table_nested_path::get_current_position(
-    const uchar *j_start, uchar *pos) const
-{
-  long j_pos= (long) (m_engine.s.c_str - j_start);
-  int4store(pos, j_pos);
-  int4store(pos+4, m_ordinality_counter);
-  if (m_cur_nested)
-  {
-    pos[8]= (uchar) m_n_cur_nested;
-    m_cur_nested->get_current_position(m_engine.s.c_str, pos + 9);
-  }
-}
-
-
-/*
-  Function sets the object to the json parser to the specified position,
-  and restores the m_ordinality_counter.
-*/
-void Json_table_nested_path::set_position(const uchar *j_start,
-                                 const uchar *j_end, const uchar *pos)
-{
-  const uchar *s_pos= (const uchar *) j_start + sint4korr(pos);
-  m_null= FALSE;
-  scan_start(m_engine.s.cs, j_start, j_end);
-
-  while (m_engine.s.c_str < s_pos)
-  {
-    if (json_get_path_next(&m_engine, &m_cur_path))
-    {
-      DBUG_ASSERT(FALSE); /* should never get here. */
-    }
-  }
-  DBUG_ASSERT(m_engine.s.c_str == s_pos);
-
-  if (m_nested)
-  {
-    unsigned char n_cur_nest= pos[8];
-    m_n_cur_nested= n_cur_nest;
-    for (Json_table_nested_path *np= m_nested; np; np= np->m_next_nested)
-    {
-      np->m_null= TRUE;
-      if (n_cur_nest-- == 0)
-        m_cur_nested= np;
-    }
-
-    m_cur_nested->set_position(j_start, j_end, pos+9);
-  }
-  m_ordinality_counter= sint4korr(pos+4);
 }
 
 
@@ -326,7 +264,6 @@ int ha_json_table::rnd_next(uchar *buf)
   if (!m_js)
     return HA_ERR_END_OF_FILE;
 
-  m_jt->m_nested_path.get_current_position((uchar *) m_js->ptr(), m_cur_pos);
   if (m_jt->m_nested_path.scan_next())
   {
     if (m_jt->m_nested_path.m_engine.s.error)
@@ -431,15 +368,124 @@ cont_loop:
 
 int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
 {
-  m_jt->m_nested_path.set_position((const uchar *) m_js->ptr(),
-                                   (const uchar *) m_js->end(), pos);
-  return rnd_next(buf);
+  Field **f= table->field;
+  Json_table_column *jc;
+  List_iterator_fast<Json_table_column> jc_i(m_jt->m_columns);
+  my_ptrdiff_t ptrdiff= buf - table->record[0];
+
+  while ((jc= jc_i++))
+  {
+    uint f_pos;
+
+    if (!bitmap_is_set(table->read_set, (*f)->field_index))
+      goto cont_loop;
+
+    if (ptrdiff)
+      (*f)->move_field_offset(ptrdiff);
+
+    f_pos= uint4korr(pos);
+
+    if (f_pos == 0)
+    {
+      (*f)->set_null();
+    }
+    else
+    {
+      (*f)->set_notnull();
+      switch (jc->m_column_type)
+      {
+      case Json_table_column::FOR_ORDINALITY:
+        (*f)->store(f_pos, TRUE);
+        break;
+      case Json_table_column::PATH:
+      case Json_table_column::EXISTS_PATH:
+      {
+        json_engine_t je;
+        json_path_step_t *cur_step;
+        uint array_counters[JSON_DEPTH_LIMIT];
+        int not_found;
+
+        json_scan_start(&je, m_js->charset(),
+                        (const uchar *) (m_js->ptr() + (f_pos-1)),
+                        (const uchar *) m_js->end());
+
+        cur_step= jc->m_path.steps;
+        not_found= json_find_path(&je, &jc->m_path, &cur_step, array_counters) ||
+                   json_read_value(&je);
+
+        if (jc->m_column_type == Json_table_column::EXISTS_PATH)
+        {
+          (*f)->store(!not_found);
+        }
+        else /*PATH*/
+        {
+          if (not_found)
+            jc->m_on_empty.respond(jc, *f);
+          else
+          {
+            if (!json_value_scalar(&je) ||
+                store_json_in_field(*f, &je))
+              jc->m_on_error.respond(jc, *f);
+            else
+            {
+              /*
+                If the path contains wildcards, check if there are
+                more matches for it in json and report an error if so.
+              */
+              if (jc->m_path.types_used &
+                    (JSON_PATH_WILD | JSON_PATH_DOUBLE_WILD) &&
+                  (json_scan_next(&je) ||
+                   !json_find_path(&je, &jc->m_path, &cur_step,
+                                   array_counters)))
+                jc->m_on_error.respond(jc, *f);
+            }
+          }
+        }
+        break;
+      }
+      };
+    }
+    if (ptrdiff)
+      (*f)->move_field_offset(-ptrdiff);
+cont_loop:
+    f++;
+    pos+= 4;
+  }
+  return 0;
 }
 
 
 void ha_json_table::position(const uchar *record)
 {
-  memcpy(ref, m_cur_pos, ref_length);
+  uchar *c_ref= ref;
+  Json_table_column *jc;
+  List_iterator_fast<Json_table_column> jc_i(m_jt->m_columns);
+
+  while ((jc= jc_i++))
+  {
+    if (jc->m_nest->m_null)
+    {
+      int4store(c_ref, 0);
+    }
+    else
+    {
+      switch (jc->m_column_type)
+      {
+      case Json_table_column::FOR_ORDINALITY:
+        int4store(c_ref, jc->m_nest->m_ordinality_counter);
+        break;
+      case Json_table_column::PATH:
+      case Json_table_column::EXISTS_PATH:
+      {
+        size_t pos= jc->m_nest->m_engine.value_begin -
+                    (const uchar *) m_js->ptr() + 1;
+        int4store(c_ref, pos);
+        break;
+      }
+      };
+    }
+    c_ref+= 4;
+  }
 }
 
 
