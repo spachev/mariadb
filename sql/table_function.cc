@@ -50,7 +50,6 @@ protected:
   Table_function_json_table *m_jt;
   String m_tmps;
   String *m_js;
-  uchar *m_cur_pos;
 public:
   ha_json_table(TABLE_SHARE *share_arg, Table_function_json_table *jt):
     handler(&table_function_hton.m_hton, share_arg), m_jt(jt)
@@ -205,7 +204,6 @@ handle_new_nested:
 
 int ha_json_table::open(const char *name, int mode, uint test_if_locked)
 {
-  m_cur_pos= (uchar*) alloc_root(&table->mem_root, ALIGN_SIZE(ref_length));
   return 0;
 }
 
@@ -455,6 +453,12 @@ cont_loop:
 }
 
 
+/*
+  The reference has 4 bytes for every column of the JSON_TABLE.
+  There it keeps 0 for the NULL values, ordinality index for
+  the ORDINALITY columns and the offset of the field's data in
+  the JSON for other column types.
+*/
 void ha_json_table::position(const uchar *record)
 {
   uchar *c_ref= ref;
@@ -1138,6 +1142,12 @@ int Table_function_json_table::setup(THD *thd, TABLE_LIST *sql_table,
       Json_table_column *jc= jc_i++;
       t->field[i]->change_charset(
           jc->m_explicit_cs ? jc->m_explicit_cs : m_json->collation);
+      /*
+        The m_field->charset is going to be reused if it's the prepared
+        statement running several times. So should restored the original
+        value.
+      */
+      jc->m_field->charset= jc->m_explicit_cs;
     }
   }
 
