@@ -719,68 +719,6 @@ RIGHT JOIN
 JSON_TABLE(jt.id, '$' COLUMNS (id FOR ORDINALITY)) as jt1 ON jt.id=jt1.id;
 ERROR 42000: Cross dependency found in OUTER JOIN; examine your ON conditions
 DROP TABLE t1;
-FLUSH STATUS;
-SELECT * FROM JSON_TABLE(
-'[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]',
-'$[*]' COLUMNS (
-c1 CHAR(255) PATH '$',
-c2 CHAR(255) PATH '$',
-c3 CHAR(255) PATH '$',
-c4 CHAR(255) PATH '$',
-c5 CHAR(255) PATH '$',
-c6 CHAR(255) PATH '$',
-c7 CHAR(255) PATH '$',
-c8 CHAR(255) PATH '$')) AS jt;
-c1	c2	c3	c4	c5	c6	c7	c8
-1	1	1	1	1	1	1	1
-2	2	2	2	2	2	2	2
-3	3	3	3	3	3	3	3
-4	4	4	4	4	4	4	4
-5	5	5	5	5	5	5	5
-6	6	6	6	6	6	6	6
-7	7	7	7	7	7	7	7
-8	8	8	8	8	8	8	8
-9	9	9	9	9	9	9	9
-10	10	10	10	10	10	10	10
-11	11	11	11	11	11	11	11
-12	12	12	12	12	12	12	12
-13	13	13	13	13	13	13	13
-14	14	14	14	14	14	14	14
-15	15	15	15	15	15	15	15
-16	16	16	16	16	16	16	16
-17	17	17	17	17	17	17	17
-18	18	18	18	18	18	18	18
-19	19	19	19	19	19	19	19
-20	20	20	20	20	20	20	20
-SHOW STATUS LIKE '%tmp%';
-Variable_name	Value
-Created_tmp_disk_tables	0
-Created_tmp_files	0
-Created_tmp_tables	0
-Handler_tmp_delete	0
-Handler_tmp_update	0
-Handler_tmp_write	0
-Rows_tmp_read	20
-#
-# Bug#25504063: EXPLAIN OF JSON_TABLE QUERY USES INTERNAL TEMP TABLES
-#
-FLUSH STATUS;
-SELECT * FROM
-JSON_TABLE(
-'[{"a":"3"}]',
-'$[*]' COLUMNS (id FOR ORDINALITY)
-) AS tt;
-id
-1
-SHOW STATUS LIKE '%tmp%';
-Variable_name	Value
-Created_tmp_disk_tables	0
-Created_tmp_files	0
-Created_tmp_tables	0
-Handler_tmp_delete	0
-Handler_tmp_update	0
-Handler_tmp_write	0
-Rows_tmp_read	1
 #
 # Bug#25525409: ASSERTION `TABLE_LIST->TABLE' FAILED IN SQL/SQL_BASE.CC
 #

@@ -602,37 +602,6 @@ SELECT * FROM t1
 
 DROP TABLE t1;
 
-# Test that tmp table can overflow to disk
-
-set @save_heap_size= @@max_heap_table_size;
-set @@max_heap_table_size= 16384;
-
-FLUSH STATUS;
-SELECT * FROM JSON_TABLE(
-  '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]',
-  '$[*]' COLUMNS (
-    c1 CHAR(255) PATH '$',
-    c2 CHAR(255) PATH '$',
-    c3 CHAR(255) PATH '$',
-    c4 CHAR(255) PATH '$',
-    c5 CHAR(255) PATH '$',
-    c6 CHAR(255) PATH '$',
-    c7 CHAR(255) PATH '$',
-    c8 CHAR(255) PATH '$')) AS jt;
-SHOW STATUS LIKE '%tmp%';
-set @@max_heap_table_size= @save_heap_size;
-
---echo #
---echo # Bug#25504063: EXPLAIN OF JSON_TABLE QUERY USES INTERNAL TEMP TABLES
---echo #
-FLUSH STATUS;
-SELECT * FROM
-  JSON_TABLE(
-    '[{"a":"3"}]',
-    '$[*]' COLUMNS (id FOR ORDINALITY)
-  ) AS tt;
-SHOW STATUS LIKE '%tmp%';
-
 --echo #
 --echo # Bug#25525409: ASSERTION `TABLE_LIST->TABLE' FAILED IN SQL/SQL_BASE.CC
 --echo #
