@@ -694,7 +694,8 @@ SELECT * FROM t1 WHERE id IN
   (SELECT id FROM t1 as tt2,
          JSON_TABLE(f1, "$" COLUMNS (jf FOR ORDINALITY)) AS tbl);
 
-select * from information_schema.OPTIMIZER_TRACE;
+select json_detailed(json_extract(trace, '$**.best_join_order'))
+    from information_schema.OPTIMIZER_TRACE;
 DROP TABLE t1;
 
 --echo # End of 10.6 tests
