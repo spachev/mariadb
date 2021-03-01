@@ -815,6 +815,12 @@ bool Create_json_table::add_json_table_fields(THD *thd, TABLE *table,
     Create_field *sql_f= jc->m_field;
     List_iterator_fast<Json_table_column> it2(jt->m_columns);
     Json_table_column *jc2;
+     /*
+       Initialize length from its original value (number of characters),
+       which was set in the parser. This is necessary if we're
+       executing a prepared statement for the second time.
+    */
+    sql_f->length= sql_f->char_length;
     if (!(jc->m_explicit_cs= sql_f->charset))
       sql_f->charset= thd->variables.collation_server;
 
