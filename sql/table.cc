@@ -9461,11 +9461,22 @@ public:
   }
 };
 
+bool FK_info::alloc(MEM_ROOT *mem_root, size_t size)
+{
+  Lex_cstring *buf= (Lex_cstring*)alloc_root(mem_root,
+                                             sizeof (Lex_cstring) * size * 2);
+  if (!buf)
+    return false;
+  foreign_fields= {buf, size};
+  referenced_fields= {buf + size, size};
 
-bool FK_info::assign(Foreign_key &src, Table_name table)
+  return true;
+}
+void FK_info::assign(Foreign_key &src, Table_name table)
 {
   DBUG_ASSERT(src.foreign);
   DBUG_ASSERT(src.type == Key::MULTIPLE);
+  DBUG_ASSERT(foreign_fields.data());
 
   foreign_id= src.constraint_name.str ? src.constraint_name : src.name;
   foreign_db= table.db;
@@ -9475,24 +9486,22 @@ bool FK_info::assign(Foreign_key &src, Table_name table)
   update_method= src.update_opt;
   delete_method= src.delete_opt;
 
+  List_iterator_fast<Key_part_spec> fk_it(src.columns);
   List_iterator_fast<Key_part_spec> ref_it(src.ref_columns);
-
-  for (const Key_part_spec &kp: src.columns)
+  for (size_t i = 0; i < src.columns.elements; i++)
   {
-    if (foreign_fields.push_back((Lex_cstring *)(&kp.field_name)))
-      return true;
-    Key_part_spec *kp2= ref_it++;
-    if (referenced_fields.push_back((Lex_cstring *)(&kp2->field_name)))
-      return true;
+    auto *fkp= fk_it++;
+    auto *rkp= ref_it++;
+    foreign_fields[i]= fkp->field_name;
+    referenced_fields[i]= rkp->field_name;
   }
-  return false;
 }
 
 
 FK_info * FK_info::clone(MEM_ROOT *mem_root) const
 {
   FK_info *dst= new (mem_root) FK_info();
-  if (!dst)
+  if (!dst || !dst->alloc(mem_root, foreign_fields.size()))
     return NULL;
 
   if (dst->foreign_id.strdup(mem_root, foreign_id))
@@ -9508,29 +9517,16 @@ FK_info * FK_info::clone(MEM_ROOT *mem_root) const
   dst->update_method= update_method;
   dst->delete_method= delete_method;
 
-  for (const Lex_cstring &src_f: foreign_fields)
+  DBUG_ASSERT(foreign_fields.size() == referenced_fields.size());
+
+  for(size_t i= 0; i < foreign_fields.size(); i++)
   {
-    Lex_cstring *dst_f= new (mem_root) Lex_cstring();
-    if (!dst_f)
+    if (dst->foreign_fields[i].strdup(mem_root, foreign_fields[i]))
       return NULL;
-    if (dst_f->strdup(mem_root, src_f))
-      return NULL;
-    if (dst->foreign_fields.push_back(dst_f, mem_root))
+       if (dst->referenced_fields[i].strdup(mem_root, referenced_fields[i]))
       return NULL;
   }
 
-  for (const Lex_cstring &src_f: referenced_fields)
-  {
-    Lex_cstring *dst_f= new (mem_root) Lex_cstring();
-    if (!dst_f)
-      return NULL;
-    if (dst_f->strdup(mem_root, src_f))
-      return NULL;
-    if (dst->referenced_fields.push_back(dst_f, mem_root))
-      return NULL;
-  }
-
-  DBUG_ASSERT(foreign_fields.elements == referenced_fields.elements);
   return dst;
 }
 
@@ -9646,37 +9642,30 @@ bool TABLE_SHARE::fk_check_consistency(THD *thd)
       }
       return true;
     }
-    List_iterator_fast<FK_info> fk_it(sa.share->foreign_keys);
-    FK_info *fk;
+
+    bool match= true;
     bool found_table= false;
-    while ((fk= fk_it++))
+    for (FK_info &fk: sa.share->foreign_keys)
     {
-      if (!::cmp_table(fk->ref_db(), db) &&
-          !::cmp_table(fk->referenced_table, table_name))
+      if (!::cmp_table(fk.ref_db(), db) &&
+          !::cmp_table(fk.referenced_table, table_name))
       {
         found_table= true;
-        List_iterator_fast<Lex_cstring> rk_fld_it(rk.referenced_fields);
-        List_iterator_fast<Lex_cstring> fk_fld_it(fk->referenced_fields);
-        List_iterator_fast<Lex_cstring> rk_fld2_it(rk.foreign_fields);
-        List_iterator_fast<Lex_cstring> fk_fld2_it(fk->foreign_fields);
-        Lex_cstring *fk_fld;
-        while ((fk_fld= fk_fld_it++))
+        if (rk.referenced_fields.size() != fk.foreign_fields.size())
+          break;
+        DBUG_ASSERT(fk.foreign_fields.size() == fk.referenced_fields.size());
+        DBUG_ASSERT(rk.foreign_fields.size() == rk.referenced_fields.size());
+
+        for (uint i = 0; match && i < fk.referenced_fields.size(); i++)
         {
-          Lex_cstring *rk_fld= rk_fld_it++;
-          if (!rk_fld || cmp(fk_fld, rk_fld))
-            break;
-          fk_fld= fk_fld2_it++;
-          DBUG_ASSERT(fk_fld);
-          rk_fld= rk_fld2_it++;
-          DBUG_ASSERT(rk_fld);
-          if (cmp(fk_fld, rk_fld))
-            break;
+          match= cmp(fk.referenced_fields[i], rk.referenced_fields[i]) == 0 &&
+                 cmp(fk.foreign_fields[i], rk.foreign_fields[i]) == 0;
         }
-        if (!fk_fld)
+        if (!match)
           break;
       }
     }
-    if (!fk)
+    if (!match)
     {
       bool warn;
       if (!warned.insert(Table_name(rk.foreign_db, rk.foreign_table), &warn))
@@ -9738,37 +9727,31 @@ bool TABLE_SHARE::fk_check_consistency(THD *thd)
       }
       return true;
     }
-    List_iterator_fast<FK_info> ref_it(sa.share->referenced_keys);
-    FK_info *rk;
+
     bool found_table= false;
-    while ((rk= ref_it++))
+    bool match= true;
+    for (FK_info &rk: sa.share->referenced_keys)
     {
-      if (!::cmp_table(rk->foreign_db, db) &&
-          !::cmp_table(rk->foreign_table, table_name))
+      if (!::cmp_table(rk.foreign_db, db) &&
+          !::cmp_table(rk.foreign_table, table_name))
       {
         found_table= true;
-        List_iterator_fast<Lex_cstring> rk_fld_it(rk->referenced_fields);
-        List_iterator_fast<Lex_cstring> fk_fld_it(fk.referenced_fields);
-        List_iterator_fast<Lex_cstring> rk_fld2_it(rk->foreign_fields);
-        List_iterator_fast<Lex_cstring> fk_fld2_it(fk.foreign_fields);
-        Lex_cstring *fk_fld;
-        while ((fk_fld= fk_fld_it++))
+
+        if (rk.referenced_fields.size() != fk.foreign_fields.size())
+          break;
+        DBUG_ASSERT(fk.foreign_fields.size() == fk.referenced_fields.size());
+        DBUG_ASSERT(rk.foreign_fields.size() == rk.referenced_fields.size());
+
+        for (uint i = 0; match && i < fk.referenced_fields.size(); i++)
         {
-          Lex_cstring *rk_fld= rk_fld_it++;
-          if (!rk_fld || cmp(fk_fld, rk_fld))
-            break;
-          fk_fld= fk_fld2_it++;
-          DBUG_ASSERT(fk_fld);
-          rk_fld= rk_fld2_it++;
-          DBUG_ASSERT(rk_fld);
-          if (cmp(fk_fld, rk_fld))
-            break;
+          match = cmp(fk.referenced_fields[i], rk.referenced_fields[i]) == 0 &&
+                  cmp(fk.foreign_fields[i], rk.foreign_fields[i]) == 0;
         }
-        if (!fk_fld)
+        if (!match)
           break;
       }
     }
-    if (!rk)
+    if (!match)
     {
       bool warn;
       if (!warned.insert(Table_name(fk.foreign_db, fk.foreign_table), &warn))
