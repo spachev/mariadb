@@ -1230,21 +1230,6 @@ CREATE VIEW test.v AS SELECT * FROM JSON_TABLE('[1,2,3]', '$[*]' COLUMNS (num IN
 SELECT * FROM test.v;
 DROP VIEW test.v;
 
---echo # Check that a user without access to the schema 'foo' cannot query
---echo # a JSON_TABLE view in that schema.
-CREATE SCHEMA foo;
-CREATE VIEW foo.v AS SELECT * FROM JSON_TABLE('[1,2,3]', '$[*]' COLUMNS (num INT PATH '$[0]')) AS jt;
-
-CREATE USER foo@localhost;
-connect (con1,localhost,foo,,);
---error ER_TABLEACCESS_DENIED_ERROR
-SELECT * FROM foo.v;
-
-connection default;
-disconnect con1;
-DROP USER foo@localhost;
-DROP SCHEMA foo;
-
 --echo # Check that a user with access to the schema 'foo' can do a SELECT with
 --echo # a JSON_TABLE function.
 CREATE SCHEMA foo;
