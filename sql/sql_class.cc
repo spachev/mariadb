@@ -5782,6 +5782,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
   if (WSREP_CLIENT_NNULL(this) &&
       wsrep_thd_is_local(this) &&
       wsrep_is_active(this) &&
+      mysql_bin_log.is_open() &&
       variables.wsrep_trx_fragment_size > 0)
   {
     if (!is_current_stmt_binlog_format_row())
