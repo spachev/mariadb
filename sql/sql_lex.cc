@@ -11401,7 +11401,8 @@ sp_condition_value *LEX::stmt_signal_value(const Lex_ident_sys_st &ident)
   }
   return cond;
 }
-
+/*
+ *   */
 
 bool LEX::add_table_foreign_key(const LEX_CSTRING &name,
                                 const LEX_CSTRING &constraint_name,
@@ -11445,7 +11446,48 @@ bool LEX::add_column_foreign_key(const LEX_CSTRING &field_name,
   if (unlikely(key == NULL))
     return true;
   last_foreign_key->columns.push_back(key);
-  last_foreign_key->init(ref_table_name.db, ref_table_name.table, fk_options);
+  return init_last_foreign_key(&ref_table_name);
+}
+
+bool LEX::init_last_foreign_key(Table_ident *ref_table_name)
+{
+  if (ref_table_name->db.str == NULL)
+    ref_table_name->db= query_tables->db;
+  else
+  {
+    char *str= strmake_root(thd->mem_root, ref_table_name->db.str,
+                            ref_table_name->db.length);
+    my_casedn_str(files_charset_info, str);
+    ref_table_name->db.str= str;
+    str= strmake_root(thd->mem_root, ref_table_name->table.str,
+                      ref_table_name->table.length);
+    my_casedn_str(files_charset_info, str);
+    ref_table_name->table.str= str;
+  }
+
+  if (ref_table_name->db.str == NULL)
+    copy_db_to(&ref_table_name->db);
+  TABLE_LIST *ref_table= find_table_in_list(query_tables,
+                                            &TABLE_LIST::next_global,
+                                            &ref_table_name->db,
+                                            &ref_table_name->table);
+
+  if (ref_table == NULL &&
+      !(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
+  {
+    ref_table= (TABLE_LIST *) thd->alloc(sizeof(TABLE_LIST));
+    if (unlikely(ref_table == NULL))
+      return true;
+    ref_table->init_one_table_for_prelocking(&ref_table_name->db,
+                                             &ref_table_name->table,
+                                             NULL, TL_READ,
+                                             TABLE_LIST::PRELOCK_NONE,
+                                             0, 0,
+                                             &query_tables_last,
+                                             false);
+  }
+  last_foreign_key->init(ref_table_name->db, ref_table_name->table, ref_table,
+                         fk_options);
   return false;
 }
 
