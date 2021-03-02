@@ -11444,9 +11444,8 @@ bool LEX::add_column_foreign_key(const LEX_CSTRING &field_name,
   Key_part_spec *key= new (thd->mem_root) Key_part_spec(&field_name, 0);
   if (unlikely(key == NULL))
     return true;
-  last_key->columns.push_back(key);
-  Foreign_key &fk= static_cast<Foreign_key &>(*last_key);
-  fk.init(ref_table_name.db, ref_table_name.table, fk_options, &ref_list);
+  last_foreign_key->columns.push_back(key);
+  last_foreign_key->init(ref_table_name.db, ref_table_name.table, fk_options);
   return false;
 }
 
