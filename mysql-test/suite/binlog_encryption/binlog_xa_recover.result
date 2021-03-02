@@ -151,6 +151,12 @@ master-bin.000004	#	Xid	#	#	COMMIT /* XID */
 SET DEBUG_SYNC= "now SIGNAL con10_cont";
 connection con10;
 connection default;
+Timeout in wait_condition.inc for select count(*) = 1 from performance_schema.threads where processlist_state = "Waiting for background binlog tasks"
+Id	User	Host	db	Command	Time	State	Info	Progress
+4	root	localhost	test	Query	0	starting	show full processlist	0.000
+5	root	localhost	test	Sleep	30		NULL	0.000
+6	root	localhost	test	Query	30	debug sync point: commit_after_group_release_commit_ordered	INSERT INTO t1 VALUES (11, REPEAT("x", 4100))	0.000
+7	root	localhost	test	Query	30	debug sync point: commit_after_group_release_commit_ordered	INSERT INTO t1 VALUES (12, REPEAT("x", 4100))	0.000
 SET DEBUG_SYNC= "now SIGNAL con12_cont";
 connection con12;
 connection default;
