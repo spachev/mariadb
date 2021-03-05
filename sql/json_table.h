@@ -1,5 +1,5 @@
-#ifndef TABLE_FUNCTION_INCLUDED
-#define TABLE_FUNCTION_INCLUDED
+#ifndef JSON_TABLE_INCLUDED
+#define JSON_TABLE_INCLUDED
 
 /* Copyright (c) 2020, MariaDB Corporation. All rights reserved.
 
@@ -36,63 +36,79 @@ class Json_table_column;
        COLUMNS( a INT PATH '$.a' ,
           NESTED PATH '$.b[*]' COLUMNS (b INT PATH '$',
                                         NESTED PATH '$.c[*]' COLUMNS(x INT PATH '$')),
-          NESTED PATH '$.n[*]' COLUMNS (z INT PAHT '$'))
+          NESTED PATH '$.n[*]' COLUMNS (z INT PATH '$'))
   results in 4 'nested_path' created:
                  root          nested_b       nested_c     nested_n
   m_path           '$[*]'         '$.b[*]'        '$.c[*]'     '$.n[*]
   m_nested          &nested_b     &nested_c       NULL         NULL
   n_next_nested     NULL          &nested_n       NULL         NULL
 
-and 4 columns created:
+  and 4 columns created:
               a          b            x            z
   m_nest    &root      &nested_b    &nested_c    &nested_n
 */
 
-
 class Json_table_nested_path : public Sql_alloc
 {
 public:
-  bool m_null; // TRUE <=> produce SQL NULL.
+  json_path_t m_path;  /* The JSON Path to get the rows from */
+  bool m_null; // TRUE <=> producing a NULL-complemented row.
 
-  json_path_t m_path;
-  json_engine_t m_engine;
-  json_path_t m_cur_path;
+  /*** Construction interface ***/
+  Json_table_nested_path():
+    m_null(TRUE), m_nested(NULL), m_next_nested(NULL)
+  {}
 
-  /* Counts the rows produced.  Value is set to the FOR ORDINALITY coluns */
+  int set_path(THD *thd, const LEX_CSTRING &path);
+
+  /*** Methods for performing a scan ***/
+  void scan_start(CHARSET_INFO *i_cs, const uchar *str, const uchar *end);
+  int scan_next();
+  bool check_error(const char *str);
+
+  /*** Members for getting the values we've scanned to ***/
+  const uchar *get_value() { return m_engine.value_begin; }
+  const uchar *get_value_end() { return m_engine.s.str_end; }
+
+  /* Counts the rows produced. Used by FOR ORDINALITY columns */
   longlong m_ordinality_counter;
 
-  /* the Json_table_nested_path that nests this. */
-  Json_table_nested_path *m_parent;
-
+  int print(THD *thd, Field ***f, String *str,
+            List_iterator_fast<Json_table_column> &it,
+            Json_table_column **last_column);
+private:
   /* The head of the list of nested NESTED PATH statements. */
   Json_table_nested_path *m_nested;
 
   /* in the above list items are linked with the */
   Json_table_nested_path *m_next_nested;
 
-  /*
-    The pointer to the 'm_next_nested' member of the
-    last item of the above list. So we can add new item to
-    the list doing *m_next_nexted_hook= new_item_ptr
-  */
-  Json_table_nested_path **m_nested_hook;
+  /*** Members describing NESTED PATH structure ***/
+  /* Parent nested path. The "root" path has this NULL */
+  Json_table_nested_path *m_parent;
 
-  /*
-    The NESTED PATH that is currently scanned in rnd_next.
-  */
+  /*** Members describing current JSON Path scan state ***/
+  /* The JSON Parser and JSON Path evaluator */
+  json_engine_t m_engine;
+
+  /* The path the parser is currently pointing to */
+  json_path_t m_cur_path;
+
+  /* The child NESTED PATH we're currently scanning */
   Json_table_nested_path *m_cur_nested;
 
-  Json_table_nested_path(Json_table_nested_path *parent_nest):
-    m_null(TRUE), m_parent(parent_nest), m_nested(0), m_next_nested(0),
-    m_nested_hook(&m_nested) {}
-  int set_path(THD *thd, const LEX_CSTRING &path);
-  void scan_start(CHARSET_INFO *i_cs, const uchar *str, const uchar *end);
-  int scan_next();
-  int print(THD *thd, Field ***f, String *str,
-            List_iterator_fast<Json_table_column> &it,
-            Json_table_column **last_column);
+  friend class Table_function_json_table;
 };
 
+
+/*
+  @brief
+    Describes the column definition in JSON_TABLE(...) syntax.
+
+  @detail
+    Has methods for printing/handling errors but otherwise it's a static
+    object.
+*/
 
 class Json_table_column : public Sql_alloc
 {
@@ -123,7 +139,7 @@ public:
   public:
     Json_table_column::enum_on_response m_response;
     LEX_CSTRING m_default;
-    void respond(Json_table_column *jc, Field *f);
+    int respond(Json_table_column *jc, Field *f);
     int print(const char *name, String *str) const;
     bool specified() const { return m_response != RESPONSE_NOT_SPECIFIED; }
   };
@@ -166,15 +182,54 @@ public:
   Then the ha_json_table instance is created based on it in
   the create_table_for_function().
 */
+
 class Table_function_json_table : public Sql_alloc
 {
 public:
+  /*** Basic properties of the original JSON_TABLE(...) ***/
   Item *m_json; /* The JSON value to be parsed. */
 
   /* The COLUMNS(...) part representation. */
   Json_table_nested_path m_nested_path;
+
   /* The list of table column definitions. */
   List<Json_table_column> m_columns;
+
+  /*** Name resolution functions ***/
+  int setup(THD *thd, TABLE_LIST *sql_table, SELECT_LEX *s_lex);
+
+  /*** Functions for interaction with the Query Optimizer ***/
+  void fix_after_pullout(TABLE_LIST *sql_table,
+                         st_select_lex *new_parent, bool merge);
+  void update_used_tables() { m_json->update_used_tables(); }
+
+  table_map used_tables() const { return m_dep_tables; }
+  bool join_cache_allowed() const { return !m_dep_tables; }
+  void get_estimates(ha_rows *out_rows,
+                     double *scan_time, double *startup_cost);
+
+  int print(THD *thd, TABLE_LIST *sql_table,
+            String *str, enum_query_type query_type);
+
+  /*** Construction interface to be used from the parser ***/
+  Table_function_json_table(Item *json):
+    m_json(json)
+  {
+    cur_parent= &m_nested_path;
+    cur_last_sibling= &m_nested_path.m_nested;
+  }
+
+  void start_nested_path(Json_table_nested_path *np);
+  void end_nested_path();
+  Json_table_nested_path *get_cur_nested_path() { return cur_parent; }
+
+  /* SQL Parser: current column in JSON_TABLE (...) syntax */
+  Json_table_column *m_cur_json_table_column;
+
+  /* SQL Parser: charset of the current text literal */
+  CHARSET_INFO *m_text_literal_cs;
+
+private:
 
   /*
     the JSON argument can be taken from other tables.
@@ -182,45 +237,19 @@ public:
     mask of these dependent tables is calculated in ::setup().
   */
   table_map m_dep_tables;
-  
-  /*
-    The 'depth' of NESTED PATH statements nesting.
-    Needed to calculate the reference length.
-    m_cur_depth is used in parser.
-  */
-  uint m_depth, m_cur_depth;
 
-  /* used in parser. */
-  Json_table_column *m_cur_json_table_column;
-  CHARSET_INFO *m_text_literal_cs;
-
-  Table_function_json_table(Item *json):
-    m_json(json), m_nested_path(0), m_depth(0), m_cur_depth(0) {}
+  /* Current NESTED PATH level being parsed */
+  Json_table_nested_path *cur_parent;
 
   /*
-    Used in sql_yacc.yy.
-    Represents the current NESTED PATH level being parsed.
+    The last sibling in the current level, if there is any. We need this
+    to call add_sibling() for it
   */
-  Json_table_nested_path *m_sql_nest;
-  void add_nested(Json_table_nested_path *np);
-  void leave_nested();
-
-  int setup(THD *thd, TABLE_LIST *sql_table, SELECT_LEX *s_lex);
-  /* if the table is ready to be used in Item_field::fix_fieds */
-  bool join_cache_allowed() const { return !m_dep_tables; }
-  table_map used_tables() const { return m_dep_tables; }
-  void get_estimates(ha_rows *out_rows,
-                     double *scan_time, double *startup_cost);
-  int print(THD *thd, TABLE_LIST *sql_table,
-            String *str, enum_query_type query_type);
-
-  void fix_after_pullout(TABLE_LIST *sql_table,
-                         st_select_lex *new_parent, bool merge);
-  void update_used_tables() { m_json->update_used_tables(); }
+  Json_table_nested_path **cur_last_sibling;
 };
 
 
 TABLE *create_table_for_function(THD *thd, TABLE_LIST *sql_table);
 
-#endif /* TABLE_FUNCTION_INCLUDED */
+#endif /* JSON_TABLE_INCLUDED */
 

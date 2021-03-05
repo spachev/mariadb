@@ -68,7 +68,7 @@
 #include "sql_sequence.h"
 #include "my_base.h"
 #include "sql_type_json.h"
-#include "table_function.h"
+#include "json_table.h"
 
 /* this is to get the bison compilation windows warnings out */
 #ifdef _MSC_VER
@@ -11535,7 +11535,7 @@ json_table_column:
 
             lex->json_table->m_cur_json_table_column=
               new (thd->mem_root) Json_table_column(f,
-                                    lex->json_table->m_sql_nest);
+                                    lex->json_table->get_cur_nested_path());
 
             if (unlikely(!f ||
                 !lex->json_table->m_cur_json_table_column))
@@ -11556,14 +11556,14 @@ json_table_column:
           {
             LEX *lex=Lex;
             Json_table_nested_path *np= new (thd->mem_root)
-              Json_table_nested_path(lex->json_table->m_sql_nest);
+              Json_table_nested_path();
             np->set_path(thd, $3);
-            lex->json_table->add_nested(np);
+            lex->json_table->start_nested_path(np);
           }
           json_table_columns_clause
           {
             LEX *lex=Lex;
-            lex->json_table->leave_nested();
+            lex->json_table->end_nested_path();
           }
         ;
 
@@ -11659,7 +11659,6 @@ table_function:
             if (unlikely(!jt))
               MYSQL_YYABORT;
             Lex->json_table= jt;
-            jt->m_sql_nest= &jt->m_nested_path;
           }
           json_text_literal json_table_columns_clause ')' opt_as ident_table_alias
           {

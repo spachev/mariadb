@@ -20,7 +20,7 @@
 #include "sql_class.h" /* TMP_TABLE_PARAM */
 #include "table.h"
 #include "item_jsonfunc.h"
-#include "table_function.h"
+#include "json_table.h"
 #include "sql_show.h"
 
 
@@ -46,10 +46,13 @@ static table_function_handlerton table_function_hton;
 
 class ha_json_table: public handler
 {
-protected:
   Table_function_json_table *m_jt;
-  String m_tmps;
-  String *m_js;
+
+  String *m_js; // The JSON document we're reading
+  String m_tmps; // Buffer for the above
+
+  int fill_column_values(uchar * buf, uchar *pos);
+
 public:
   ha_json_table(TABLE_SHARE *share_arg, Table_function_json_table *jt):
     handler(&table_function_hton.m_hton, share_arg), m_jt(jt)
@@ -62,44 +65,41 @@ public:
       that call makes no sence for ha_json_table.
    */
     mark_trx_read_write_done= 1;
+
+    /* See ha_json_table::position for format definition */
     ref_length= m_jt->m_columns.elements * 4;
   }
   ~ha_json_table() {}
-  handler *clone(const char *name, MEM_ROOT *mem_root) { return NULL; }
-  const char *index_type(uint inx) { return "NONE"; }
+  handler *clone(const char *name, MEM_ROOT *mem_root) override { return NULL; }
   /* Rows also use a fixed-size format */
-  enum row_type get_row_type() const { return ROW_TYPE_FIXED; }
-  ulonglong table_flags() const
+  enum row_type get_row_type() const override { return ROW_TYPE_FIXED; }
+  ulonglong table_flags() const override
   {
     return (HA_FAST_KEY_READ | /*HA_NO_BLOBS |*/ HA_NULL_IN_KEY |
             HA_CAN_SQL_HANDLER |
             HA_REC_NOT_IN_SEQ | HA_NO_TRANSACTIONS |
-            HA_HAS_RECORDS | HA_CAN_HASH_KEYS);
+            HA_HAS_RECORDS);
   }
-  ulong index_flags(uint inx, uint part, bool all_parts) const
+  ulong index_flags(uint inx, uint part, bool all_parts) const override
   {
     return HA_ONLY_WHOLE_INDEX | HA_KEY_SCAN_NOT_ROR;
   }
-  ha_rows records() { return HA_POS_ERROR; }
-  uint max_supported_keys() const { return 1; }
-  uint max_supported_key_part_length() const { return MAX_KEY_LENGTH; }
+  ha_rows records() override { return HA_POS_ERROR; }
 
-  int open(const char *name, int mode, uint test_if_locked);
-  int close(void) { return 0; }
-  int rnd_init(bool scan);
-  int rnd_next(uchar *buf);
-  int rnd_pos(uchar * buf, uchar *pos);
-  void position(const uchar *record);
-  int can_continue_handler_scan() { return 1; }
-  int info(uint);
-  int extra(enum ha_extra_function operation);
+  int open(const char *name, int mode, uint test_if_locked) override
+  { return 0; }
+  int close(void) override { return 0; }
+  int rnd_init(bool scan) override;
+  int rnd_next(uchar *buf) override;
+  int rnd_pos(uchar * buf, uchar *pos) override;
+  void position(const uchar *record) override;
+  int info(uint) override;
+  int extra(enum ha_extra_function operation) override { return 0; }
   THR_LOCK_DATA **store_lock(THD *thd, THR_LOCK_DATA **to,
-			     enum thr_lock_type lock_type)
+			     enum thr_lock_type lock_type) override
     { return NULL; }
   int create(const char *name, TABLE *form, HA_CREATE_INFO *create_info)
-    { return 1; }
-private:
-  void update_key_stats();
+    override { return 1; }
 };
 
 
@@ -123,7 +123,7 @@ public:
     m_null_count(0)
   { }
 
-  void add_field(TABLE *table, Field *field, uint fieldnr, bool force_not_null_cols);
+  void add_field(TABLE *table, Field *field, uint fieldnr);
 
   TABLE *start(THD *thd,
                TMP_TABLE_PARAM *param,
@@ -143,14 +143,14 @@ public:
 
   @detail
     Note: non-root nested paths are set to scan one JSON node (that is, a
-    "subdocument")
+    "subdocument").
 */
 
 void Json_table_nested_path::scan_start(CHARSET_INFO *i_cs,
                                         const uchar *str, const uchar *end)
 {
   json_get_path_start(&m_engine, i_cs, str, end, &m_cur_path);
-  m_cur_nested= 0;
+  m_cur_nested= NULL;
   m_null= false;
   m_ordinality_counter= 0;
 }
@@ -202,18 +202,6 @@ handle_new_nested:
 }
 
 
-int ha_json_table::open(const char *name, int mode, uint test_if_locked)
-{
-  return 0;
-}
-
-
-int ha_json_table::extra(enum ha_extra_function operation)
-{
-  return 0;
-}
-
-
 int ha_json_table::rnd_init(bool scan)
 {
   Json_table_nested_path &p= m_jt->m_nested_path;
@@ -228,6 +216,12 @@ int ha_json_table::rnd_init(bool scan)
   DBUG_RETURN(0);
 }
 
+
+/*
+  @brief
+     Store JSON value in an SQL field, doing necessary special conversions
+     for JSON's null, true, and false.
+*/
 
 static int store_json_in_field(Field *f, const json_engine_t *je)
 {
@@ -253,22 +247,34 @@ static int store_json_in_field(Field *f, const json_engine_t *je)
 }
 
 
+bool Json_table_nested_path::check_error(const char *str)
+{
+  if (m_engine.s.error)
+  {
+    report_json_error_ex(str, &m_engine, "JSON_TABLE", 0,
+                         Sql_condition::WARN_LEVEL_ERROR);
+    return true; // Error
+  }
+  return false; // Ok
+}
+
+
 int ha_json_table::rnd_next(uchar *buf)
 {
-  Field **f= table->field;
-  Json_table_column *jc;
+  int res;
   enum_check_fields cf_orig;
 
   if (!m_js)
     return HA_ERR_END_OF_FILE;
 
+  /*
+    Step 1: Move the root nested path to the next record (this implies moving
+    its child nested paths accordingly)
+  */
   if (m_jt->m_nested_path.scan_next())
   {
-    if (m_jt->m_nested_path.m_engine.s.error)
+    if (m_jt->m_nested_path.check_error(m_js->ptr()))
     {
-      report_json_error_ex(m_js->ptr(), &m_jt->m_nested_path.m_engine,
-          "JSON_TABLE", 0, Sql_condition::WARN_LEVEL_ERROR);
-
       /*
         We already reported an error, so returning an
         error code that just doesn't produce extra
@@ -279,92 +285,30 @@ int ha_json_table::rnd_next(uchar *buf)
     return HA_ERR_END_OF_FILE;
   }
   
+  /*
+    Step 2: Read values for all columns (the columns refer to nested paths
+    they are in).
+  */
   cf_orig= table->in_use->count_cuted_fields;
   table->in_use->count_cuted_fields= CHECK_FIELD_EXPRESSION;
-  /*
-    Get the values for each field of the table
-  */
-  List_iterator_fast<Json_table_column> jc_i(m_jt->m_columns);
-  my_ptrdiff_t ptrdiff= buf - table->record[0];
-  while ((jc= jc_i++))
-  {
-    if (!bitmap_is_set(table->read_set, (*f)->field_index))
-      goto cont_loop;
-
-    if (ptrdiff)
-      (*f)->move_field_offset(ptrdiff);
-    if (jc->m_nest->m_null)
-    {
-      (*f)->set_null();
-    }
-    else
-    {
-      (*f)->set_notnull();
-      switch (jc->m_column_type)
-      {
-      case Json_table_column::FOR_ORDINALITY:
-        (*f)->store(jc->m_nest->m_ordinality_counter, TRUE);
-        break;
-      case Json_table_column::PATH:
-      case Json_table_column::EXISTS_PATH:
-      {
-        json_engine_t je;
-        json_engine_t &nest_je= jc->m_nest->m_engine;
-        json_path_step_t *cur_step;
-        uint array_counters[JSON_DEPTH_LIMIT];
-        int not_found;
-
-        json_scan_start(&je, nest_je.s.cs,
-                        nest_je.value_begin, nest_je.s.str_end);
-
-        cur_step= jc->m_path.steps;
-        not_found= json_find_path(&je, &jc->m_path, &cur_step, array_counters) ||
-                   json_read_value(&je);
-
-        if (jc->m_column_type == Json_table_column::EXISTS_PATH)
-        {
-          (*f)->store(!not_found);
-        }
-        else /*PATH*/
-        {
-          if (not_found)
-            jc->m_on_empty.respond(jc, *f);
-          else
-          {
-            if (!json_value_scalar(&je) ||
-                store_json_in_field(*f, &je))
-              jc->m_on_error.respond(jc, *f);
-            else
-            {
-              /*
-                If the path contains wildcards, check if there are
-                more matches for it in json and report an error if so.
-              */
-              if (jc->m_path.types_used &
-                    (JSON_PATH_WILD | JSON_PATH_DOUBLE_WILD) &&
-                  (json_scan_next(&je) ||
-                   !json_find_path(&je, &jc->m_path, &cur_step,
-                                   array_counters)))
-                jc->m_on_error.respond(jc, *f);
-            }
-
-          }
-        }
-        break;
-      }
-      };
-    }
-    if (ptrdiff)
-      (*f)->move_field_offset(-ptrdiff);
-cont_loop:
-    f++;
-  }
+  res= fill_column_values(buf, NULL);
   table->in_use->count_cuted_fields= cf_orig;
-  return 0;
+  return res ? HA_ERR_TABLE_IN_FK_CHECK : 0;
 }
 
 
-int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
+/*
+  @brief
+    Fill values of table columns, taking data either from Json_nested_path
+    objects, or from the rowid value
+
+  @param pos   NULL means the data should be read from Json_nested_path
+                 objects.
+               Non-null value is a pointer to previously saved rowid (see
+                 ha_json_table::position() for description)
+*/
+
+int ha_json_table::fill_column_values(uchar * buf, uchar *pos)
 {
   Field **f= table->field;
   Json_table_column *jc;
@@ -373,7 +317,8 @@ int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
 
   while ((jc= jc_i++))
   {
-    uint f_pos;
+    bool is_null_value;
+    uint int_pos;
 
     if (!bitmap_is_set(table->read_set, (*f)->field_index))
       goto cont_loop;
@@ -381,9 +326,17 @@ int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
     if (ptrdiff)
       (*f)->move_field_offset(ptrdiff);
 
-    f_pos= uint4korr(pos);
+    /*
+      Read the NULL flag:
+       - if we are reading from a rowid value, 0 means SQL NULL.
+       - if scanning json document, read it from the nested path
+    */
+    if (pos)
+      is_null_value= !(int_pos= uint4korr(pos));
+    else
+     is_null_value= jc->m_nest->m_null;
 
-    if (f_pos == 0)
+    if (is_null_value)
     {
       (*f)->set_null();
     }
@@ -393,8 +346,16 @@ int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
       switch (jc->m_column_type)
       {
       case Json_table_column::FOR_ORDINALITY:
-        (*f)->store(f_pos, TRUE);
+      {
+        /*
+          Read the cardinality counter:
+           - read it from nested path when scanning the json document
+           - or, read it from rowid when in rnd_pos() call
+        */
+        longlong counter= pos? int_pos: jc->m_nest->m_ordinality_counter;
+        (*f)->store(counter, TRUE);
         break;
+      }
       case Json_table_column::PATH:
       case Json_table_column::EXISTS_PATH:
       {
@@ -402,10 +363,27 @@ int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
         json_path_step_t *cur_step;
         uint array_counters[JSON_DEPTH_LIMIT];
         int not_found;
+        const uchar* node_start;
+        const uchar* node_end;
 
-        json_scan_start(&je, m_js->charset(),
-                        (const uchar *) (m_js->ptr() + (f_pos-1)),
-                        (const uchar *) m_js->end());
+        /*
+          Get the JSON context node that we will need to evaluate PATH or
+          EXISTS against:
+           - when scanning the json document, read it from nested path
+           - when in rnd_pos call, the rowid has the start offset.
+        */
+        if (pos)
+        {
+          node_start= (const uchar *) (m_js->ptr() + (int_pos-1));
+          node_end= (const uchar *) m_js->end();
+        }
+        else
+        {
+          node_start= jc->m_nest->get_value();
+          node_end=   jc->m_nest->get_value_end();
+        }
+
+        json_scan_start(&je, m_js->charset(), node_start, node_end);
 
         cur_step= jc->m_path.steps;
         not_found= json_find_path(&je, &jc->m_path, &cur_step, array_counters) ||
@@ -418,12 +396,18 @@ int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
         else /*PATH*/
         {
           if (not_found)
-            jc->m_on_empty.respond(jc, *f);
+          {
+            if (jc->m_on_empty.respond(jc, *f))
+              goto error_return;
+          }
           else
           {
             if (!json_value_scalar(&je) ||
                 store_json_in_field(*f, &je))
-              jc->m_on_error.respond(jc, *f);
+            {
+              if (jc->m_on_error.respond(jc, *f))
+                goto error_return;
+            }
             else
             {
               /*
@@ -435,7 +419,10 @@ int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
                   (json_scan_next(&je) ||
                    !json_find_path(&je, &jc->m_path, &cur_step,
                                    array_counters)))
-                jc->m_on_error.respond(jc, *f);
+              {
+                if (jc->m_on_error.respond(jc, *f))
+                  goto error_return;
+              }
             }
           }
         }
@@ -447,9 +434,18 @@ int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
       (*f)->move_field_offset(-ptrdiff);
 cont_loop:
     f++;
-    pos+= 4;
+    if (pos)
+      pos+= 4;
   }
   return 0;
+error_return:
+  return 1;
+}
+
+
+int ha_json_table::rnd_pos(uchar * buf, uchar *pos)
+{
+  return fill_column_values(buf, pos);
 }
 
 
@@ -481,7 +477,7 @@ void ha_json_table::position(const uchar *record)
       case Json_table_column::PATH:
       case Json_table_column::EXISTS_PATH:
       {
-        size_t pos= jc->m_nest->m_engine.value_begin -
+        size_t pos= jc->m_nest->get_value() -
                     (const uchar *) m_js->ptr() + 1;
         int4store(c_ref, pos);
         break;
@@ -506,17 +502,10 @@ int ha_json_table::info(uint)
 }
 
 
-void Create_json_table::add_field(TABLE *table, Field *field,
-                                  uint fieldnr, bool force_not_null_cols)
+void Create_json_table::add_field(TABLE *table, Field *field, uint fieldnr)
 {
   DBUG_ASSERT(!field->field_name.str ||
               strlen(field->field_name.str) == field->field_name.length);
-
-  if (force_not_null_cols)
-  {
-    field->flags|= NOT_NULL_FLAG;
-    field->null_ptr= NULL;
-  }
 
   if (!(field->flags & NOT_NULL_FLAG))
     m_null_count++;
@@ -858,7 +847,7 @@ bool Create_json_table::add_json_table_fields(THD *thd, TABLE *table,
     if (!f)
       goto err_exit;
     f->init(table);
-    add_field(table, f, fieldnr++, FALSE);
+    add_field(table, f, fieldnr++);
   }
 
   share->fields= fieldnr;
@@ -1033,7 +1022,7 @@ int Json_table_nested_path::set_path(THD *thd, const LEX_CSTRING &path)
     to NULL, or set it to default value).
 */
 
-void Json_table_column::On_response::respond(Json_table_column *jc, Field *f)
+int Json_table_column::On_response::respond(Json_table_column *jc, Field *f)
 {
   switch (m_response)
   {
@@ -1045,13 +1034,14 @@ void Json_table_column::On_response::respond(Json_table_column *jc, Field *f)
       f->set_null();
       my_error(ER_JSON_TABLE_ERROR_ON_FIELD, MYF(0),
           f->field_name.str, f->table->alias.ptr());
-      break;
+      return 1;
     case Json_table_column::RESPONSE_DEFAULT:
       f->set_notnull();
       f->store(m_default.str,
           m_default.length, jc->m_defaults_cs);
       break;
   }
+  return 0;
 }
 
 
@@ -1090,20 +1080,21 @@ int Json_table_column::On_response::print(const char *name, String *str) const
 }
 
 
-void Table_function_json_table::add_nested(Json_table_nested_path *np)
-{ 
-  *m_sql_nest->m_nested_hook= np;
-  m_sql_nest->m_nested_hook= &np->m_next_nested;
-  m_sql_nest= np;
-  if (++m_cur_depth > m_depth)
-    m_depth= m_cur_depth;
+void Table_function_json_table::start_nested_path(Json_table_nested_path *np)
+{
+  np->m_parent= cur_parent;
+  *cur_last_sibling= np;
+
+  // Make the newly added path the parent
+  cur_parent= np;
+  cur_last_sibling= &np->m_nested;
 }
 
 
-void Table_function_json_table::leave_nested()
-{ 
-  m_sql_nest= m_sql_nest->m_parent;
-  --m_cur_depth;
+void Table_function_json_table::end_nested_path()
+{
+  cur_last_sibling= &cur_parent->m_next_nested;
+  cur_parent= cur_parent->m_parent;
 }
 
 
@@ -1175,7 +1166,8 @@ int Table_function_json_table::setup(THD *thd, TABLE_LIST *sql_table,
 }
 
 void Table_function_json_table::get_estimates(ha_rows *out_rows,
-                                  double *scan_time, double *startup_cost)
+                                              double *scan_time,
+                                              double *startup_cost)
 {
   *out_rows= 40;
   *scan_time= 0.0;
@@ -1282,13 +1274,12 @@ int Table_function_json_table::print(THD *thd, TABLE_LIST *sql_table,
 void Table_function_json_table::fix_after_pullout(TABLE_LIST *sql_table,
        st_select_lex *new_parent, bool merge)
 {
-  if (m_dep_tables)
-    sql_table->dep_tables&= ~m_dep_tables;
+  sql_table->dep_tables&= ~m_dep_tables;
+
   m_json->fix_after_pullout(new_parent, &m_json, merge);
   m_dep_tables= m_json->used_tables();
 
-  if (m_dep_tables)
-    sql_table->dep_tables|= m_dep_tables;
+  sql_table->dep_tables|= m_dep_tables;
 }
 
 

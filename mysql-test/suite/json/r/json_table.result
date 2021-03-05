@@ -123,6 +123,7 @@ price int
 insert into t1 values ("red", 100), ("blue", 50);
 insert into t1 select * from t1;
 insert into t1 select * from t1;
+set @save_optimizer_switch=@@optimizer_switch;
 set optimizer_switch='firstmatch=off';
 select * from 
 json_table('[{"color": "blue", "price": 50},
@@ -136,6 +137,7 @@ T.color in (select color from t1 where t1.price=T.price);
 color	price
 blue	50
 red	100
+set @@optimizer_switch=@save_optimizer_switch;
 drop table t1;
 select * from
 json_table(' [ {"color": "blue", "sizes": [1,2,3,4],  "prices" : [10,20]},

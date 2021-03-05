@@ -34,7 +34,7 @@
 #include "sql_tvc.h"
 #include "item.h"
 #include "sql_limit.h"                // Select_limit_counters
-#include "table_function.h"           // Json_table_column
+#include "json_table.h"               // Json_table_column
 #include "sql_schema.h"
 
 /* Used for flags of nesting constructs */
