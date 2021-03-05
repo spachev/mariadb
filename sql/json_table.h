@@ -216,7 +216,7 @@ public:
     m_json(json)
   {
     cur_parent= &m_nested_path;
-    cur_last_sibling= &m_nested_path.m_nested;
+    last_sibling_hook= &m_nested_path.m_nested;
   }
 
   void start_nested_path(Json_table_nested_path *np);
@@ -242,10 +242,11 @@ private:
   Json_table_nested_path *cur_parent;
 
   /*
-    The last sibling in the current level, if there is any. We need this
-    to call add_sibling() for it
+    Pointer to the list tail where we add the next NESTED PATH.
+    It points to the cur_parnt->m_nested for the first nested
+    and prev_nested->m_next_nested for the coesequent ones.
   */
-  Json_table_nested_path **cur_last_sibling;
+  Json_table_nested_path **last_sibling_hook;
 };
 
 

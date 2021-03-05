@@ -1083,17 +1083,17 @@ int Json_table_column::On_response::print(const char *name, String *str) const
 void Table_function_json_table::start_nested_path(Json_table_nested_path *np)
 {
   np->m_parent= cur_parent;
-  *cur_last_sibling= np;
+  *last_sibling_hook= np;
 
   // Make the newly added path the parent
   cur_parent= np;
-  cur_last_sibling= &np->m_nested;
+  last_sibling_hook= &np->m_nested;
 }
 
 
 void Table_function_json_table::end_nested_path()
 {
-  cur_last_sibling= &cur_parent->m_next_nested;
+  last_sibling_hook= &cur_parent->m_next_nested;
   cur_parent= cur_parent->m_parent;
 }
 
