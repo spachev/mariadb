@@ -2069,6 +2069,7 @@ static os_thread_ret_t DECLARE_THREAD(buf_flush_page_cleaner)(void*)
                   " See the man page of setpriority().";
 #endif /* UNIV_LINUX */
 
+  auto last_activity_count= srv_get_activity_count();
   ulint last_pages= 0;
   timespec abstime;
   set_timespec(abstime, 1);
@@ -2095,7 +2096,9 @@ furious_flush:
     else if (srv_shutdown_state > SRV_SHUTDOWN_INITIATED)
       break;
 
-    if (buf_pool.page_cleaner_idle())
+    if (buf_pool.page_cleaner_idle() &&
+        (!UT_LIST_GET_LEN(buf_pool.flush_list) ||
+         srv_max_dirty_pages_pct_lwm == 0.0))
       my_cond_wait(&buf_pool.do_flush_list,
                    &buf_pool.flush_list_mutex.m_mutex);
     else
@@ -2135,11 +2138,20 @@ unemployed:
     const double dirty_pct= double(dirty_blocks) * 100.0 /
       double(UT_LIST_GET_LEN(buf_pool.LRU) + UT_LIST_GET_LEN(buf_pool.free));
 
+    bool idle_flush= false;
+
     if (lsn_limit);
     else if (srv_max_dirty_pages_pct_lwm != 0.0)
     {
-      if (dirty_pct < srv_max_dirty_pages_pct_lwm)
+      /* We enable idle flushing if the server is not performing
+      trx_t::commit() of write transactions. */
+      idle_flush= dirty_pct < srv_max_dirty_pages_pct_lwm;
+      const auto activity_count= srv_get_activity_count();
+      if (idle_flush && activity_count != last_activity_count)
+      {
+        last_activity_count= activity_count;
         goto unemployed;
+      }
     }
     else if (dirty_pct < srv_max_buf_pool_modified_pct)
       goto unemployed;
@@ -2163,7 +2175,7 @@ unemployed:
       pthread_cond_broadcast(&buf_pool.done_flush_list);
       goto try_checkpoint;
     }
-    else if (!srv_adaptive_flushing)
+    else if (idle_flush || !srv_adaptive_flushing)
     {
       n_flushed= buf_flush_lists(srv_io_capacity, LSN_MAX);
 try_checkpoint:
