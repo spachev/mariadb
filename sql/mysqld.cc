@@ -132,11 +132,6 @@
 
 #define mysqld_charset &my_charset_latin1
 
-/* We have HAVE_valgrind below as this speeds up the shutdown of MySQL */
-
-#if defined(HAVE_valgrind) && defined(__linux__)
-#define HAVE_CLOSE_SERVER_SOCK 1
-#endif
 
 extern "C" {					// Because of SCO 3.2V4.2
 #include <sys/stat.h>
@@ -1492,7 +1487,6 @@ static int test_if_case_insensitive(const char *dir_name);
 static bool pid_file_created= false;
 static void usage(void);
 static void start_signal_handler(void);
-static void close_server_sock();
 static void clean_up_mutexes(void);
 static void wait_for_signal_thread_to_end(void);
 static void create_pid_file();
@@ -1632,7 +1626,6 @@ static void break_connect_loop()
     if (error != 0 && error != ETIMEDOUT && !count++)
       sql_print_error("Got error %d from mysql_cond_timedwait", error);
 #endif
-    close_server_sock();
   }
   mysql_mutex_unlock(&LOCK_start_thread);
 #endif /* __WIN__ */
@@ -1764,46 +1757,6 @@ static void close_connections(void)
 
   DBUG_PRINT("quit",("close_connections thread"));
   DBUG_VOID_RETURN;
-}
-
-
-#ifdef HAVE_CLOSE_SERVER_SOCK
-static void close_socket(MYSQL_SOCKET sock, const char *info)
-{
-  DBUG_ENTER("close_socket");
-
-  if (mysql_socket_getfd(sock) != INVALID_SOCKET)
-  {
-    DBUG_PRINT("info", ("calling shutdown on %s socket", info));
-    (void) mysql_socket_shutdown(sock, SHUT_RDWR);
-  }
-  DBUG_VOID_RETURN;
-}
-#endif
-
-
-static void close_server_sock()
-{
-#ifdef HAVE_CLOSE_SERVER_SOCK
-  DBUG_ENTER("close_server_sock");
-
-  for (std::vector<MYSQL_SOCKET>::iterator sock= listen_sockets.begin();
-       sock != listen_sockets.end(); ++sock)
-  {
-    if (sock->is_unix_domain_socket)
-    {
-      close_socket(*sock, "unix/IP");
-      (void) unlink(mysqld_unix_port);
-    }
-    else
-    {
-      close_socket(*sock, "TCP/IP");
-    }
-  }
-  listen_sockets.clear();
-
-  DBUG_VOID_RETURN;
-#endif
 }
 
 #endif /*EMBEDDED_LIBRARY*/
