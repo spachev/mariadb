@@ -2125,6 +2125,8 @@ public:
     return 0;
   }
 
+  virtual bool check_table_name_processor(void *arg) { return false; }
+
   /* 
     TRUE if the expression depends only on the table indicated by tab_map
     or can be converted to such an exression using equalities.
@@ -2323,6 +2325,13 @@ public:
     uint count;
     int nest_level;
     bool collect;
+  };
+
+  struct Check_table_name_prm
+  {
+    LEX_CSTRING db;
+    LEX_CSTRING table_name;
+    String field;
   };
 
   /*
@@ -3641,6 +3650,8 @@ public:
     }
     return 0;
   }
+  bool check_table_name_processor(void *arg) override;
+
   void cleanup() override;
   Item_equal *get_item_equal() override { return item_equal; }
   void set_item_equal(Item_equal *item_eq) override { item_equal= item_eq; }

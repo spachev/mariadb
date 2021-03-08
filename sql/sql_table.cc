@@ -4056,6 +4056,19 @@ handler *mysql_create_frm_image(THD *thd, const LEX_CSTRING &db,
       goto err;
     }
 
+    if (part_info->part_expr)
+    {
+      Item::Check_table_name_prm p;
+      p.db= db;
+      p.table_name= table_name;
+      if (part_info->part_expr->walk(&Item::check_table_name_processor, false,
+                                     (void *) &p))
+      {
+        my_error(ER_BAD_FIELD_ERROR, MYF(0), p.field.c_ptr(), "partition function");
+        goto err;
+      }
+    }
+
     /*
       We reverse the partitioning parser and generate a standard format
       for syntax stored in frm file.
