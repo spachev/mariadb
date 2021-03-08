@@ -486,12 +486,23 @@ public:
     : db(_db), name(_name) {}
   int cmp(const Table_name &rhs) const
   {
-    int db_cmp= cmp_table(db, rhs.db);
-    if (db_cmp < 0)
+    if (db.length < rhs.db.length)
       return -1;
-    if (db_cmp > 0)
+    if (db.length > rhs.db.length)
       return 1;
-    return cmp_table(name, rhs.name);
+    if (db.str != rhs.db.str)
+    {
+      int db_cmp= cmp_table(db, rhs.db);
+      if (db_cmp)
+        return db_cmp;
+    }
+    if (name.length < rhs.name.length)
+      return -1;
+    if (name.length > rhs.name.length)
+      return 1;
+    if (name.str != rhs.name.str)
+      return cmp_table(name, rhs.name);
+    return 0;
   }
   bool strdup(MEM_ROOT *mem_root)
   {
