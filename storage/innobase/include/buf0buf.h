@@ -1946,6 +1946,8 @@ public:
 private:
   /** whether the page cleaner needs wakeup from indefinite sleep */
   bool page_cleaner_is_idle;
+  /** srv_activity_count() observed by the page cleaner */
+  ulint last_activity_count;
 public:
   /** signalled to wake up the page_cleaner; protected by flush_list_mutex */
   pthread_cond_t do_flush_list;
@@ -1964,6 +1966,32 @@ public:
   {
     mysql_mutex_assert_owner(&flush_list_mutex);
     page_cleaner_is_idle= deep_sleep;
+  }
+
+  /** Initialize the activity count observed by the page cleaner */
+  void set_activity_count(ulint activity_count)
+  {
+    mysql_mutex_assert_owner(&flush_list_mutex);
+    last_activity_count= activity_count;
+  }
+
+  /** @return the activity count observed by the page cleaner */
+  ulint get_activity_count() const
+  {
+    mysql_mutex_assert_owner(&flush_list_mutex);
+    return last_activity_count;
+  }
+
+  /** Update server activity count
+  @param activity_count   srv_get_activity_count()
+  @return whether the activity count differed from the previous one */
+  bool update_activity_count(ulint activity_count)
+  {
+    mysql_mutex_assert_owner(&flush_list_mutex);
+    if (last_activity_count == activity_count)
+      return false;
+    last_activity_count= activity_count;
+    return true;
   }
 
   // n_flush_LRU + n_flush_list is approximately COUNT(io_fix()==BUF_IO_WRITE)

@@ -134,8 +134,15 @@ inline void buf_pool_t::page_cleaner_wakeup()
   double dirty_pct= double(UT_LIST_GET_LEN(buf_pool.flush_list)) * 100.0 /
     double(UT_LIST_GET_LEN(buf_pool.LRU) + UT_LIST_GET_LEN(buf_pool.free));
   double pct_lwm= srv_max_dirty_pages_pct_lwm;
-  if ((pct_lwm != 0.0 && pct_lwm <= dirty_pct) ||
-      srv_max_buf_pool_modified_pct <= dirty_pct)
+
+  /* Wake up the buf_flush_page_cleaner thread if:
+  (1) innodb_max_dirty_pages_pct is exceeded, or
+  (2) innodb_max_dirty_pages_pct_lwm is nonzero and exceeded, or
+  (3) innodb_max_dirty_pages_pct_lwm is nonzero and the server is idle */
+  if (srv_max_buf_pool_modified_pct <= dirty_pct ||
+      (pct_lwm != 0.0 &&
+       (pct_lwm <= dirty_pct ||
+        srv_get_activity_count() == buf_pool.get_activity_count())))
   {
     page_cleaner_is_idle= false;
     pthread_cond_signal(&do_flush_list);
@@ -2069,12 +2076,12 @@ static os_thread_ret_t DECLARE_THREAD(buf_flush_page_cleaner)(void*)
                   " See the man page of setpriority().";
 #endif /* UNIV_LINUX */
 
-  auto last_activity_count= srv_get_activity_count();
   ulint last_pages= 0;
   timespec abstime;
   set_timespec(abstime, 1);
 
   mysql_mutex_lock(&buf_pool.flush_list_mutex);
+  buf_pool.set_activity_count(srv_get_activity_count());
 
   lsn_t lsn_limit;
 
@@ -2146,12 +2153,9 @@ unemployed:
       /* We enable idle flushing if the server is not performing
       trx_t::commit() of write transactions. */
       idle_flush= dirty_pct < srv_max_dirty_pages_pct_lwm;
-      const auto activity_count= srv_get_activity_count();
-      if (idle_flush && activity_count != last_activity_count)
-      {
-        last_activity_count= activity_count;
+      if (idle_flush &&
+          !buf_pool.update_activity_count(srv_get_activity_count()))
         goto unemployed;
-      }
     }
     else if (dirty_pct < srv_max_buf_pool_modified_pct)
       goto unemployed;
