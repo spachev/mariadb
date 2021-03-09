@@ -3840,8 +3840,7 @@ bool copy_keys_from_share(TABLE *outparam, MEM_ROOT *root)
 enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
                        const LEX_CSTRING *alias, uint db_stat, uint prgflag,
                        uint ha_open_flags, TABLE *outparam,
-                       // FIXME: remove is_create_table
-                       bool is_create_table, List<String> *partitions_to_open)
+                       List<String> *partitions_to_open)
 {
   enum open_frm_error error;
   uint records, i, bitmap_size, bitmap_count;

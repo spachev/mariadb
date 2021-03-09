@@ -9192,8 +9192,7 @@ static int create_table_for_inplace_alter(THD *thd,
                        alter_ctx.new_name.str, alter_ctx.get_tmp_path());
   if (share->init_from_binary_frm_image(thd, true, frm->str, frm->length) ||
       open_table_from_share(thd, share, &alter_ctx.new_name, 0,
-                            EXTRA_RECORD, thd->open_options,
-                            table, false))
+                            EXTRA_RECORD, thd->open_options, table))
   {
     free_table_share(share);
     deletefrm(alter_ctx.get_tmp_path());

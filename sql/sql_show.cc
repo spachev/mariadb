@@ -5088,7 +5088,7 @@ static int fill_schema_table_from_frm(THD *thd, TABLE *table,
 
   if (!open_table_from_share(thd, share, table_name, 0,
                              (EXTRA_RECORD | OPEN_FRM_FILE_ONLY),
-                             thd->open_options, &tbl, FALSE))
+                             thd->open_options, &tbl))
   {
     tbl.s= share;
     table_list.table= &tbl;
