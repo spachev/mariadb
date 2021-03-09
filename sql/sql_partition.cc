@@ -4367,7 +4367,7 @@ bool TABLE_SHARE::unpack_partition(THD *thd, handlerton *default_db_type)
   LEX *old_lex= thd->lex;
   LEX lex;
   PSI_statement_locker *parent_locker= thd->m_statement_psi;
-  DBUG_ENTER("mysql_unpack_partition");
+  DBUG_ENTER("TABLE_SHARE::unpack_partition");
 
   thd->variables.character_set_client= system_charset_info;
 

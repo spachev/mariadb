@@ -1952,11 +1952,13 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
         thd->set_n_backup_active_arena(&part_func_arena, &backup_arena);
         thd->stmt_arena= &part_func_arena;
 
-        bool tmp= share->unpack_partition(thd, plugin_hton(share->default_part_plugin));
-        // FIXME: handle error
+        bool error=
+          share->unpack_partition(thd, plugin_hton(share->default_part_plugin));
         thd->stmt_arena= backup_stmt_arena_ptr;
         thd->restore_active_arena(&part_func_arena, &backup_arena);
         share->part_info->item_free_list= part_func_arena.free_list;
+        if (error)
+          goto err;
       }
 #else
       if (partition_info_str_len)
